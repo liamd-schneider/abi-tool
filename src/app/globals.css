@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --background: oklch(0.984 0.004 275);
+  --foreground: oklch(0.22 0.025 275);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --muted: oklch(0.955 0.008 275);
+  --muted-foreground: oklch(0.5 0.02 275);
+  --border: oklch(0.915 0.01 275);
+  --input: oklch(0.875 0.012 275);
+  --primary: oklch(0.52 0.21 275);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-soft: oklch(0.95 0.035 275);
+  --destructive: oklch(0.58 0.21 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.78 0.16 75);
+  --warning-foreground: oklch(0.45 0.11 60);
+  --success: oklch(0.6 0.15 155);
+  --ring: oklch(0.52 0.21 275 / 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: oklch(0.17 0.015 275);
+    --foreground: oklch(0.95 0.008 275);
+    --card: oklch(0.215 0.018 275);
+    --muted: oklch(0.255 0.018 275);
+    --muted-foreground: oklch(0.7 0.02 275);
+    --border: oklch(0.3 0.02 275);
+    --input: oklch(0.35 0.02 275);
+    --primary: oklch(0.68 0.17 275);
+    --primary-foreground: oklch(0.16 0.02 275);
+    --primary-soft: oklch(0.29 0.06 275);
+    --destructive: oklch(0.66 0.2 25);
+    --destructive-foreground: oklch(0.16 0.02 275);
+    --warning: oklch(0.8 0.15 80);
+    --warning-foreground: oklch(0.85 0.12 80);
+    --success: oklch(0.72 0.15 155);
+    --ring: oklch(0.68 0.17 275 / 0.4);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success: var(--success);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* <details> ohne Standard-Dreieck */
+summary {
+  list-style: none;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
