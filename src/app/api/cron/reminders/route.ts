@@ -1,4 +1,5 @@
 import { formatTime, relativeDay } from "@/lib/dates";
+import { dispatchPendingPushes } from "@/lib/push";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Wird von Vercel Cron aufgerufen (siehe vercel.json): erinnert an Schichten in den nächsten 36 Stunden.
@@ -48,5 +49,8 @@ export async function GET(request: Request) {
     );
   }
 
-  return Response.json({ reminded: due.length });
+  // Erinnerungen (und evtl. liegengebliebene Benachrichtigungen) als Push verschicken
+  const pushed = await dispatchPendingPushes();
+
+  return Response.json({ reminded: due.length, pushed });
 }

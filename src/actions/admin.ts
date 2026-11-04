@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { requireAdmin, usernameToEmail } from "@/lib/auth";
+import { dispatchPendingPushesSafe } from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { bool, dbError, int, num, optStr, str } from "@/lib/forms";
@@ -11,7 +13,11 @@ import { safeUrl } from "@/lib/utils";
 import { generatePassword, makeUsername, parseNameLine } from "@/lib/usernames";
 import type { ActionState, NeedKind, Role } from "@/lib/types";
 
-const refresh = () => revalidatePath("/", "layout");
+/** Seiten neu laden + neu entstandene Benachrichtigungen (DB-Trigger) nach der Antwort als Push senden */
+const refresh = () => {
+  revalidatePath("/", "layout");
+  after(dispatchPendingPushesSafe);
+};
 
 function localTime(fd: FormData, key: string): string | null {
   const value = str(fd, key);
@@ -443,6 +449,17 @@ export async function deleteAnnouncement(_prev: ActionState, fd: FormData): Prom
   if (error) return dbError(error);
   refresh();
   return { ok: true, message: "Gelöscht." };
+}
+
+// =================================================================== Walkthrough
+
+export async function completeAdminTour(): Promise<ActionState> {
+  const me = await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ admin_tour_done_at: new Date().toISOString() }).eq("id", me.id);
+  if (error) return dbError(error);
+  revalidatePath("/admin", "layout");
+  return { ok: true };
 }
 
 // =================================================================== Abstimmungen

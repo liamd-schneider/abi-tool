@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireUser } from "@/lib/auth";
+import { dispatchPendingPushesSafe, pushPublicKey, sendPushToUser } from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dbError, int, optStr, str } from "@/lib/forms";
@@ -56,6 +58,7 @@ export async function cancelShift(_prev: ActionState, fd: FormData): Promise<Act
             link: `/admin/termine/${shift.event_id}`,
           })),
       );
+      after(dispatchPendingPushesSafe);
     }
   }
 
@@ -145,6 +148,21 @@ export async function clearReadNotifications(): Promise<ActionState> {
   if (error) return dbError(error);
   refresh();
   return { ok: true, message: "Gelesene Benachrichtigungen gelöscht." };
+}
+
+// ---------------------------------------------------------------- Push
+
+export async function sendTestPush(): Promise<ActionState> {
+  const me = await requireUser();
+  if (!pushPublicKey()) return { error: "Push ist auf dem Server nicht eingerichtet." };
+  const devices = await sendPushToUser(me.id, {
+    title: "Test-Benachrichtigung",
+    body: "Push funktioniert – du verpasst ab jetzt nichts mehr.",
+    url: "/benachrichtigungen",
+    tag: "test",
+  });
+  if (devices === 0) return { error: "Auf keinem Gerät erreichbar – bitte Push neu aktivieren." };
+  return { ok: true, message: devices === 1 ? "Test an 1 Gerät gesendet." : `Test an ${devices} Geräte gesendet.` };
 }
 
 // ---------------------------------------------------------------- Kalender-Abo

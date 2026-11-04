@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AppHeader } from "@/components/app-header";
 import { MobileNav } from "@/components/nav";
+import { ServiceWorkerRegistrar } from "@/components/push";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,6 +19,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <AppHeader profile={profile} unread={count ?? 0} />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 md:pb-16">{children}</main>
       <MobileNav />
+      <ServiceWorkerRegistrar />
     </>
   );
 }

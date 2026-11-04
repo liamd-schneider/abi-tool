@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { CalendarSync, KeyRound, LogOut, RefreshCw } from "lucide-react";
+import { BellRing, CalendarSync, KeyRound, LogOut, RefreshCw } from "lucide-react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { CopyButton } from "@/components/copy-button";
+import { PushToggle } from "@/components/push";
+import { pushPublicKey } from "@/lib/push";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,6 +60,20 @@ export default async function ProfilePage() {
           ))}
         </div>
       ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BellRing className="size-5 text-primary" /> Push-Benachrichtigungen
+          </CardTitle>
+          <CardDescription>
+            Erinnerungen an deine Schichten, neue Termine, Abstimmungen und Neuigkeiten direkt aufs Handy. Gilt pro Gerät.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PushToggle vapidKey={pushPublicKey()} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

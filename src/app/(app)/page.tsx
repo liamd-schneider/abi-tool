@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, BellRing, Cake, CalendarDays, Clock, Megaphone, Pin, TriangleExclamationPoint, Vote } from "lucide-react";
 import { Countdown } from "@/components/countdown";
+import { PushPrompt } from "@/components/push";
+import { pushPublicKey } from "@/lib/push";
 import { DateBlock, LocationLink } from "@/components/event-bits";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -124,6 +126,8 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Hallo {firstName(me.full_name)}!</h1>
         <p className="mt-1 text-sm text-muted-foreground">{formatDateLong(nowStr)}</p>
       </div>
+
+      <PushPrompt vapidKey={pushPublicKey()} />
 
       {/* Warnungen für bald anstehende eigene Schichten */}
       {soonShifts.length > 0 ? (

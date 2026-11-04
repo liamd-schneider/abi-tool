@@ -12,11 +12,12 @@ Planungstool für unseren Abi-Jahrgang: Termine, Schichtpläne, Spenden/Dienste,
 - **Schichten:** mit einem Klick ein-/austragen, alle sehen, wer wo eingetragen ist, Überbuchung ist unmöglich
 - **Dienste & Spenden:** Kuchen, Waffelteig, Leihgaben (Pavillon …), Material – mit Mengen
 - **Abstimmungen** wie bei WhatsApp: antippen = abstimmen, Einzel-/Mehrfachwahl, optional anonym, Live-Ergebnisse
-- **Benachrichtigungen:** neue Termine, Neuigkeiten und Abstimmungen, geänderte/gestrichene Schichten, Erinnerung am Vortag
+- **Benachrichtigungen:** neue Termine, Neuigkeiten und Abstimmungen, geänderte/gestrichene Schichten, Erinnerung am Vortag – in der App (Glocke) und als **Push aufs Handy** (Web Push, ohne Firebase/Google Console; iPhone ab iOS 16.4 nach „Zum Home-Bildschirm“)
 - **Kalender ohne Google-API:** „Zu Google Kalender“-Button, `.ics`-Download und persönlicher Abo-Link (webcal) für alle Termine + eigene Schichten
 - Login mit **Benutzername + Passwort** (`vorname.nachname`), man bleibt dauerhaft eingeloggt; als App auf den Homescreen legbar
 
 **Für Admins (`/admin`)**
+- **Walkthrough**: startet beim ersten Besuch automatisch (jederzeit über „Anleitung“), dazu eine Einrichtungs-Checkliste in der Übersicht
 - Termine anlegen/bearbeiten/veröffentlichen (Entwurf → veröffentlicht)
 - Schichten einzeln oder als Blöcke erzeugen (z. B. 14–20 Uhr in 2-h-Blöcken), Personen ein-/austragen, Anwesenheit abhaken
 - Bedarf (Spenden/Leihgaben/Material) und Sortiment pflegen, „abgegeben“ abhaken
@@ -41,6 +42,8 @@ npm run dev                  # http://localhost:3000
 | `SUPABASE_SECRET_KEY` | Secret Key (`sb_secret_…`) – **geheim**, nur serverseitig (Accounts anlegen, Kalender-Feed, Cron) |
 | `AUTH_USERNAME_EMAIL_DOMAIN` | interne Pseudo-Mail-Domain für Logins, Standard `abi.local` |
 | `CRON_SECRET` | schützt `/api/cron/reminders` |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | Schlüsselpaar für Web Push – erzeugen mit `npx web-push generate-vapid-keys`. Privater Schlüssel ist **geheim**. |
+| `VAPID_SUBJECT` | Kontakt für die Push-Dienste (`https://…` oder `mailto:…`) |
 | `DATABASE_URL` | nur für Migrationen (`npm run db:push`), nicht auf Vercel nötig |
 
 ## Datenbank
@@ -67,8 +70,12 @@ Alle weiteren Accounts im Browser unter **Admin → Mitglieder**: Namensliste ei
 ## Deployment (Vercel)
 
 1. Repo in Vercel importieren (Framework: Next.js, keine weiteren Einstellungen nötig).
-2. Unter *Settings → Environment Variables* setzen: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `AUTH_USERNAME_EMAIL_DOMAIN`, `CRON_SECRET`.
+2. Unter *Settings → Environment Variables* setzen: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `AUTH_USERNAME_EMAIL_DOMAIN`, `CRON_SECRET`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
 3. Deployen. Der Cron-Job aus [`vercel.json`](vercel.json) läuft täglich um 15:00 UTC (16/17 Uhr deutscher Zeit) und erinnert an Schichten der nächsten 36 Stunden.
+
+## Wie Push funktioniert
+
+Alles, was in der Glocke landet (Tabelle `notifications`), geht zusätzlich als Push raus: direkt nach jeder Admin-Aktion (über `after()`), bei kurzfristigen Abmeldungen und beim täglichen Cron. Bei mehr als 3 neuen Benachrichtigungen auf einmal kommt eine Sammel-Push. Abgelaufene Abos (App gelöscht, Erlaubnis entzogen) werden automatisch entfernt. Aktivieren kann man Push pro Gerät unter **Profil**. Lokal funktioniert das in Chrome/Edge auf `http://localhost`, aufs Handy erst nach dem Deployment (HTTPS).
 
 ## Projektstruktur
 

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Bell, CheckCheck } from "lucide-react";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { PushPrompt } from "@/components/push";
+import { pushPublicKey } from "@/lib/push";
 import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { clearReadNotifications, markAllNotificationsRead } from "@/actions/member";
 import { requireUser } from "@/lib/auth";
@@ -47,6 +49,8 @@ export default async function NotificationsPage() {
           </>
         }
       />
+
+      <PushPrompt vapidKey={pushPublicKey()} className="mb-4" />
 
       {notifications.length === 0 ? (
         <EmptyState icon={<Bell className="size-6" />} title="Keine Benachrichtigungen">

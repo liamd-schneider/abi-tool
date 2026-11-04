@@ -7,6 +7,7 @@ export interface Profile {
   full_name: string;
   role: Role;
   calendar_token: string;
+  admin_tour_done_at: string | null;
 }
 
 export interface PersonRef {

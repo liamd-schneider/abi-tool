@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, EmptyState, PageHeader, PersonChip, SectionTitle } from "@/components/ui/misc";
+import { SetupChecklist } from "@/components/admin/setup-checklist";
+import { requireAdmin } from "@/lib/auth";
 import { formatDateShort, formatRange, formatStamp, formatTimeRange, isUpcoming, nowMs, relativeDay } from "@/lib/dates";
 import { loadMemberStats } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
@@ -30,9 +32,20 @@ interface Activity {
 }
 
 export default async function AdminOverviewPage() {
+  const me = await requireAdmin();
   const supabase = await createClient();
   const now = nowMs();
   const weekAgo = new Date(now - 7 * 86_400_000).toISOString();
+  const head = { count: "exact", head: true } as const;
+
+  const [allEvents, publishedEvents, allShifts, allNews, allPolls, myPush] = await Promise.all([
+    supabase.from("events").select("id", head),
+    supabase.from("events").select("id", head).eq("published", true),
+    supabase.from("shifts").select("id", head),
+    supabase.from("announcements").select("id", head),
+    supabase.from("polls").select("id", head),
+    supabase.from("push_subscriptions").select("id", head).eq("user_id", me.id),
+  ]);
 
   const [eventsRes, signupsRes, pledgesRes, stats] = await Promise.all([
     supabase
@@ -106,6 +119,45 @@ export default async function AdminOverviewPage() {
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, 15);
 
+  const checklist = [
+    {
+      label: "Mitglieder anlegen",
+      hint: "Namensliste einfügen – Zugangsdaten werden automatisch erzeugt.",
+      href: "/admin/mitglieder",
+      done: stats.some((s) => s.role === "member"),
+    },
+    {
+      label: "Ersten Termin anlegen",
+      hint: "Titel, Zeit, Ort – erst mal als Entwurf.",
+      href: "/admin/termine/neu",
+      done: (allEvents.count ?? 0) > 0,
+    },
+    {
+      label: "Schichten für einen Termin anlegen",
+      hint: "Einzeln oder als Schichtblöcke.",
+      href: "/admin/termine",
+      done: (allShifts.count ?? 0) > 0,
+    },
+    {
+      label: "Termin veröffentlichen",
+      hint: "Erst dann sehen ihn alle und werden benachrichtigt.",
+      href: "/admin/termine",
+      done: (publishedEvents.count ?? 0) > 0,
+    },
+    {
+      label: "Neuigkeit oder Abstimmung erstellen",
+      hint: "z. B. „Willkommen im Abi-Tool!“",
+      href: "/admin/neuigkeiten",
+      done: (allNews.count ?? 0) + (allPolls.count ?? 0) > 0,
+    },
+    {
+      label: "Push auf deinem Handy aktivieren",
+      hint: "Unter Profil – damit du kurzfristige Abmeldungen sofort mitbekommst.",
+      href: "/profil",
+      done: (myPush.count ?? 0) > 0,
+    },
+  ];
+
   const inactive = stats.filter((s) => s.shiftsTotal === 0 && s.pledges === 0);
   const drafts = events.filter((e) => !e.published).length;
 
@@ -128,6 +180,8 @@ export default async function AdminOverviewPage() {
         }
         className="mb-0"
       />
+
+      <SetupChecklist items={checklist} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tiles.map(({ label, value, icon: Icon, href, sub }) => (
