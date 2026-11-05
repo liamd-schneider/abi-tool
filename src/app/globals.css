@@ -71,6 +71,18 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* iOS: Datums-/Zeitfelder haben sonst eine feste Mindestbreite und ragen über den Rand */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 /* <details> ohne Standard-Dreieck */
 summary {
   list-style: none;

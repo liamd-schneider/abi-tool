@@ -115,7 +115,7 @@ export default async function ProfilePage() {
           <CardDescription>Am besten direkt nach dem ersten Login dein Startpasswort ändern.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ActionForm action={changePassword} resetOnSuccess className="grid gap-3 sm:grid-cols-2">
+          <ActionForm action={changePassword} resetOnSuccess className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input type="text" name="username" autoComplete="username" value={me.username} readOnly hidden />
             <Field label="Neues Passwort" htmlFor="password">
               <Input id="password" name="password" type="password" minLength={8} autoComplete="new-password" required />

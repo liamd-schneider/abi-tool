@@ -130,6 +130,31 @@ export interface PollOption {
   sort_order: number;
 }
 
+export interface ShoppingItem {
+  id: string;
+  event_id: string;
+  title: string;
+  quantity: string | null;
+  note: string | null;
+  assigned_to: string | null;
+  cost: number | null;
+  bought_at: string | null;
+  bought_by: string | null;
+  created_at: string;
+}
+
+export interface OrganizerRow {
+  user_id: string;
+  permissions: string[];
+  profiles: { full_name: string } | null;
+}
+
+export interface MemberRef {
+  id: string;
+  full_name: string;
+  role: Role;
+}
+
 export type ActionState<T = undefined> = {
   ok?: boolean;
   error?: string;

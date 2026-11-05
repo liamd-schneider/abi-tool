@@ -43,7 +43,38 @@ export default async function StatsPage() {
         }
       />
 
-      <Card className="overflow-x-auto">
+      {/* Handy: Kartenliste mit allen Zahlen */}
+      <Card className="sm:hidden">
+        <ul className="divide-y divide-border">
+          {stats.map((s, i) => {
+            const nothing = s.shiftsTotal === 0 && s.pledges === 0;
+            return (
+              <li key={s.id} className={nothing ? "px-4 py-3 text-muted-foreground" : "px-4 py-3"}>
+                <div className="flex items-baseline gap-2">
+                  <span className="w-6 shrink-0 text-xs tabular-nums text-muted-foreground">{i + 1}.</span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{s.full_name}</span>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums">{formatHours(s.hoursDone + s.hoursPlanned)}</span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 pl-8 text-xs text-muted-foreground">
+                  <span>
+                    {s.shiftsDone} geleistet{s.shiftsUpcoming > 0 ? ` · ${s.shiftsUpcoming} geplant` : ""}
+                  </span>
+                  <span>{s.pledges} Spenden</span>
+                  {s.attended + s.missed > 0 ? (
+                    <span>
+                      ✓ {s.attended} / <span className={s.missed > 0 ? "font-semibold text-destructive" : undefined}>✗ {s.missed}</span>
+                    </span>
+                  ) : null}
+                  {s.lastActivity ? <span>aktiv {formatStamp(s.lastActivity)}</span> : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+
+      {/* Ab Tablet: Tabelle */}
+      <Card className="hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="border-b border-border text-left text-xs text-muted-foreground">
             <tr>

@@ -1,5 +1,32 @@
 import type { ReactNode } from "react";
+import { Plus } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
+
+/** Einklappbarer "+ … hinzufügen"-Bereich – hält lange Verwaltungsseiten auf dem Handy kurz */
+export function AddPanel({
+  title,
+  hint,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  hint?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className="group rounded-xl border border-dashed border-border" open={defaultOpen}>
+      <summary className="flex cursor-pointer items-center gap-2 p-3 text-sm font-semibold text-primary select-none sm:p-4">
+        <Plus className="size-4 shrink-0 transition-transform group-open:rotate-45" aria-hidden />
+        {title}
+      </summary>
+      <div className="border-t border-dashed border-border p-3 sm:p-4">
+        {hint ? <p className="mb-3 text-xs text-muted-foreground">{hint}</p> : null}
+        {children}
+      </div>
+    </details>
+  );
+}
 
 export function PageHeader({
   title,

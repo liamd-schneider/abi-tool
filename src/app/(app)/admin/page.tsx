@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarDays, Cake, Clock, Plus, Users } from "lucide-react";
+import { CalendarDays, Cake, Clock, Plus, ShoppingCart, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,9 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Admin" };
 
+/** Pro Termin höchstens so viele offene Schichten bzw. Bedarfe in der Übersicht zeigen */
+const MAX_GAP_ROWS = 5;
+
 interface OverviewEvent {
   id: string;
   title: string;
@@ -21,6 +24,7 @@ interface OverviewEvent {
   published: boolean;
   shifts: { id: string; title: string; starts_at: string; ends_at: string; capacity: number; shift_signups: { user_id: string }[] }[];
   event_needs: { id: string; title: string; unit: string | null; quantity_needed: number; need_pledges: { quantity: number }[] }[];
+  shopping_items: { bought_at: string | null }[];
 }
 
 interface Activity {
@@ -51,7 +55,7 @@ export default async function AdminOverviewPage() {
     supabase
       .from("events")
       .select(
-        "id, title, starts_at, ends_at, published, shifts(id, title, starts_at, ends_at, capacity, shift_signups(user_id)), event_needs(id, title, unit, quantity_needed, need_pledges(quantity))",
+        "id, title, starts_at, ends_at, published, shifts(id, title, starts_at, ends_at, capacity, shift_signups(user_id)), event_needs(id, title, unit, quantity_needed, need_pledges(quantity)), shopping_items(bought_at)",
       )
       .gte("starts_at", weekAgo)
       .order("starts_at")
@@ -81,9 +85,10 @@ export default async function AdminOverviewPage() {
       const needs = e.event_needs.filter((n) => n.need_pledges.reduce((s, p) => s + p.quantity, 0) < n.quantity_needed);
       shifts.forEach((s) => (freeSlots += s.capacity - s.shift_signups.length));
       needs.forEach((n) => (missingItems += n.quantity_needed - n.need_pledges.reduce((s, p) => s + p.quantity, 0)));
-      return { event: e, shifts, needs };
+      const openShopping = e.shopping_items.filter((i) => !i.bought_at).length;
+      return { event: e, shifts, needs, openShopping };
     })
-    .filter((g) => g.shifts.length > 0 || g.needs.length > 0);
+    .filter((g) => g.shifts.length > 0 || g.needs.length > 0 || g.openShopping > 0);
 
   type SignupActivity = {
     shift_id: string;
@@ -209,15 +214,15 @@ export default async function AdminOverviewPage() {
         {gaps.length === 0 ? (
           <EmptyState title="Alles abgedeckt – nichts offen." />
         ) : (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {gaps.map(({ event, shifts, needs }) => (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {gaps.map(({ event, shifts, needs, openShopping }) => (
               <Card key={event.id}>
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
-                    <Link href={`/admin/termine/${event.id}`} className="hover:underline">
-                      <CardTitle>{event.title}</CardTitle>
+                    <Link href={`/admin/termine/${event.id}`} className="min-w-0 hover:underline">
+                      <CardTitle className="break-words">{event.title}</CardTitle>
                     </Link>
-                    <div className="flex gap-1">
+                    <div className="flex shrink-0 flex-wrap justify-end gap-1">
                       {!event.published ? <Badge variant="warning">Entwurf</Badge> : null}
                       <Badge variant="muted">{relativeDay(event.starts_at, now)}</Badge>
                     </div>
@@ -225,7 +230,7 @@ export default async function AdminOverviewPage() {
                   <p className="text-xs text-muted-foreground">{formatRange(event.starts_at, event.ends_at)}</p>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-1.5 text-sm">
-                  {shifts.map((s) => (
+                  {shifts.slice(0, MAX_GAP_ROWS).map((s) => (
                     <div key={s.id} className="flex items-center gap-2">
                       <Clock className="size-3.5 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1 truncate">
@@ -239,7 +244,7 @@ export default async function AdminOverviewPage() {
                       </Badge>
                     </div>
                   ))}
-                  {needs.map((n) => {
+                  {needs.slice(0, MAX_GAP_ROWS).map((n) => {
                     const pledged = n.need_pledges.reduce((s, p) => s + p.quantity, 0);
                     return (
                       <div key={n.id} className="flex items-center gap-2">
@@ -251,6 +256,21 @@ export default async function AdminOverviewPage() {
                       </div>
                     );
                   })}
+                  {openShopping > 0 ? (
+                    <Link href={`/admin/termine/${event.id}#einkauf`} className="flex items-center gap-2 hover:underline">
+                      <ShoppingCart className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1 truncate">Einkaufsliste</span>
+                      <Badge variant="warning" className="tabular-nums">
+                        {openShopping} offen
+                      </Badge>
+                    </Link>
+                  ) : null}
+                  {shifts.length > MAX_GAP_ROWS || needs.length > MAX_GAP_ROWS ? (
+                    <Link href={`/admin/termine/${event.id}`} className="mt-1 text-xs font-medium text-primary hover:underline">
+                      +{Math.max(0, shifts.length - MAX_GAP_ROWS) + Math.max(0, needs.length - MAX_GAP_ROWS)} weitere offene
+                      Punkte →
+                    </Link>
+                  ) : null}
                 </CardContent>
               </Card>
             ))}
@@ -258,7 +278,7 @@ export default async function AdminOverviewPage() {
         )}
       </section>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         <section>
           <SectionTitle>Letzte Eintragungen</SectionTitle>
           {activity.length === 0 ? (

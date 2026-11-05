@@ -16,6 +16,12 @@ Planungstool für unseren Abi-Jahrgang: Termine, Schichtpläne, Spenden/Dienste,
 - **Kalender ohne Google-API:** „Zu Google Kalender“-Button, `.ics`-Download und persönlicher Abo-Link (webcal) für alle Termine + eigene Schichten
 - Login mit **Benutzername + Passwort** (`vorname.nachname`), man bleibt dauerhaft eingeloggt; als App auf den Homescreen legbar
 
+**Orga-Team pro Termin**
+- Admins setzen pro Termin Leute ins **Orga-Team** und wählen jedes Mal einzeln, was sie dürfen: Einkaufsliste, Schichten, Spenden & Material, Sortiment, Termindaten
+- Veröffentlichen, Löschen und das Orga-Team selbst bleiben immer bei den Admins (auch per Datenbank-Trigger abgesichert)
+- Das Orga-Team verwaltet „seine“ Termine unter `/termine/<id>/verwalten` (Link auf der Startseite und der Terminseite) und sieht sie auch als Entwurf
+- **Einkaufsliste** pro Termin (nur Admins + Orga-Team sichtbar): Artikel, Menge, Notiz, wer kauft, abhaken wenn besorgt, Betrag → Summe „Ausgegeben“
+
 **Für Admins (`/admin`)**
 - **Walkthrough**: startet beim ersten Besuch automatisch (jederzeit über „Anleitung“), dazu eine Einrichtungs-Checkliste in der Übersicht
 - Termine anlegen/bearbeiten/veröffentlichen (Entwurf → veröffentlicht)
@@ -55,7 +61,7 @@ npx supabase migration new <name>   # SQL-Datei bearbeiten
 npm run db:push                     # spielt neue Migrationen ein
 ```
 
-Alle Zugriffsrechte sind per Row Level Security in der Datenbank geregelt: Mitglieder können nur ihre eigenen Einträge ändern, Admins alles, ohne Login gibt es keine Daten.
+Alle Zugriffsrechte sind per Row Level Security in der Datenbank geregelt: Mitglieder können nur ihre eigenen Einträge ändern, das Orga-Team eines Termins genau das, wofür es freigeschaltet ist (`can_manage(event_id, recht)`), Admins alles, ohne Login gibt es keine Daten.
 
 **Wichtig in Supabase:** Authentication → Sign In / Providers → „Allow new users to sign up“ muss **aus** sein. Accounts legen nur Admins an.
 

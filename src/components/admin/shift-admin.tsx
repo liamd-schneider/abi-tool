@@ -2,9 +2,9 @@ import { Check, Pencil, Plus, Trash, X } from "lucide-react";
 import { ActionForm, Hidden, SubmitButton } from "@/components/action-form";
 import { Badge } from "@/components/ui/badge";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
-import { Avatar } from "@/components/ui/misc";
+import { AddPanel, Avatar } from "@/components/ui/misc";
 import { Progress } from "@/components/ui/progress";
-import { adminAddSignup, adminRemoveSignup, deleteShift, generateShifts, saveShift, setAttendance } from "@/actions/admin";
+import { addSignupFor, deleteShift, generateShifts, removeSignupFor, saveShift, setAttendance } from "@/actions/event";
 import { addHours, formatDateShort, formatStamp, formatTimeRange, toLocalInput } from "@/lib/dates";
 import type { ShiftRow, ShiftWithSignups } from "@/lib/types";
 
@@ -90,7 +90,7 @@ export function ShiftAdmin({ shift, members }: { shift: ShiftWithSignups; member
                   <X className="size-3.5" />
                 </SubmitButton>
               </ActionForm>
-              <ActionForm action={adminRemoveSignup} confirm={`${s.profiles?.full_name ?? "Person"} austragen?`}>
+              <ActionForm action={removeSignupFor} confirm={`${s.profiles?.full_name ?? "Person"} austragen?`}>
                 <Hidden name="shift_id" value={shift.id} />
                 <Hidden name="user_id" value={s.user_id} />
                 <SubmitButton variant="destructive-ghost" size="xs" title="Austragen" aria-label="Austragen">
@@ -103,7 +103,7 @@ export function ShiftAdmin({ shift, members }: { shift: ShiftWithSignups; member
       )}
 
       {free > 0 && available.length > 0 ? (
-        <ActionForm action={adminAddSignup} className="flex gap-2">
+        <ActionForm action={addSignupFor} className="flex gap-2">
           <Hidden name="shift_id" value={shift.id} />
           <Select name="user_id" defaultValue="" className="h-8 flex-1 text-sm" aria-label="Person eintragen">
             <option value="" disabled>
@@ -126,7 +126,7 @@ export function ShiftAdmin({ shift, members }: { shift: ShiftWithSignups; member
           <summary className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-primary">
             <Pencil className="size-3.5" /> Bearbeiten
           </summary>
-          <ActionForm action={saveShift} className="mt-3 grid gap-3 sm:grid-cols-2">
+          <ActionForm action={saveShift} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Hidden name="id" value={shift.id} />
             <ShiftFields shift={shift} defaultStart={shift.starts_at} defaultEnd={shift.ends_at} />
             <div className="sm:col-span-2">
@@ -148,13 +148,22 @@ export function ShiftAdmin({ shift, members }: { shift: ShiftWithSignups; member
   );
 }
 
-export function AddShiftForms({ eventId, eventStart, eventEnd }: { eventId: string; eventStart: string; eventEnd: string | null }) {
+export function AddShiftForms({
+  eventId,
+  eventStart,
+  eventEnd,
+  open = false,
+}: {
+  eventId: string;
+  eventStart: string;
+  eventEnd: string | null;
+  open?: boolean;
+}) {
   const end = eventEnd ?? addHours(eventStart, 2);
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <div className="rounded-xl border border-dashed border-border p-4">
-        <p className="mb-3 font-semibold">Einzelne Schicht hinzufügen</p>
-        <ActionForm action={saveShift} className="grid gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+      <AddPanel title="Schicht hinzufügen" defaultOpen={open}>
+        <ActionForm action={saveShift} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Hidden name="event_id" value={eventId} />
           <ShiftFields defaultStart={eventStart} defaultEnd={addHours(eventStart, 2)} />
           <div className="sm:col-span-2">
@@ -163,14 +172,13 @@ export function AddShiftForms({ eventId, eventStart, eventEnd }: { eventId: stri
             </SubmitButton>
           </div>
         </ActionForm>
-      </div>
+      </AddPanel>
 
-      <div className="rounded-xl border border-dashed border-border p-4">
-        <p className="font-semibold">Schichtblöcke erzeugen</p>
-        <p className="mb-3 text-xs text-muted-foreground">
-          z. B. „Verkauf“ von 14 bis 20 Uhr in 2-Stunden-Blöcken → 3 Schichten auf einmal.
-        </p>
-        <ActionForm action={generateShifts} className="grid gap-3 sm:grid-cols-2">
+      <AddPanel
+        title="Mehrere Schichtblöcke auf einmal"
+        hint="z. B. „Verkauf“ von 14 bis 20 Uhr in 2-Stunden-Blöcken → 3 Schichten auf einmal."
+      >
+        <ActionForm action={generateShifts} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Hidden name="event_id" value={eventId} />
           <Field label="Bezeichnung *" className="sm:col-span-2">
             <Input name="title" required maxLength={120} placeholder="z. B. Verkauf" />
@@ -196,7 +204,7 @@ export function AddShiftForms({ eventId, eventStart, eventEnd }: { eventId: stri
             </SubmitButton>
           </div>
         </ActionForm>
-      </div>
+      </AddPanel>
     </div>
   );
 }

@@ -2,9 +2,9 @@ import { Check, Pencil, Plus, Trash } from "lucide-react";
 import { ActionForm, Hidden, SubmitButton } from "@/components/action-form";
 import { Badge } from "@/components/ui/badge";
 import { Field, Input, Select } from "@/components/ui/input";
-import { Avatar } from "@/components/ui/misc";
+import { AddPanel, Avatar } from "@/components/ui/misc";
 import { Progress } from "@/components/ui/progress";
-import { adminRemovePledge, deleteNeed, saveNeed, setDelivered } from "@/actions/admin";
+import { deleteNeed, removePledge, saveNeed, setDelivered } from "@/actions/event";
 import { formatStamp } from "@/lib/dates";
 import { NEED_KIND_LABEL, type NeedRow, type NeedWithPledges } from "@/lib/types";
 
@@ -84,7 +84,7 @@ export function NeedAdmin({ need }: { need: NeedWithPledges }) {
                   <Check className="size-3.5" /> <span className="hidden sm:inline">{p.delivered ? "da" : "abgegeben?"}</span>
                 </SubmitButton>
               </ActionForm>
-              <ActionForm action={adminRemovePledge} confirm="Eintrag entfernen?">
+              <ActionForm action={removePledge} confirm="Eintrag entfernen?">
                 <Hidden name="id" value={p.id} />
                 <SubmitButton variant="destructive-ghost" size="xs" aria-label="Entfernen">
                   <Trash className="size-3.5" />
@@ -100,7 +100,7 @@ export function NeedAdmin({ need }: { need: NeedWithPledges }) {
           <summary className="inline-flex cursor-pointer items-center gap-1 text-sm font-medium text-primary">
             <Pencil className="size-3.5" /> Bearbeiten
           </summary>
-          <ActionForm action={saveNeed} className="mt-3 grid gap-3 sm:grid-cols-2">
+          <ActionForm action={saveNeed} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Hidden name="id" value={need.id} />
             <NeedFields need={need} />
             <div className="sm:col-span-2">
@@ -119,11 +119,10 @@ export function NeedAdmin({ need }: { need: NeedWithPledges }) {
   );
 }
 
-export function AddNeedForm({ eventId }: { eventId: string }) {
+export function AddNeedForm({ eventId, open = false }: { eventId: string; open?: boolean }) {
   return (
-    <div className="rounded-xl border border-dashed border-border p-4">
-      <p className="mb-3 font-semibold">Bedarf hinzufügen</p>
-      <ActionForm action={saveNeed} resetOnSuccess className="grid gap-3 sm:grid-cols-2">
+    <AddPanel title="Bedarf hinzufügen (Spende, Leihgabe, Material)" defaultOpen={open}>
+      <ActionForm action={saveNeed} resetOnSuccess className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Hidden name="event_id" value={eventId} />
         <NeedFields />
         <div className="sm:col-span-2">
@@ -132,6 +131,6 @@ export function AddNeedForm({ eventId }: { eventId: string }) {
           </SubmitButton>
         </div>
       </ActionForm>
-    </div>
+    </AddPanel>
   );
 }

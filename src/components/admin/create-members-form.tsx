@@ -45,7 +45,7 @@ export function CreateMembersForm() {
 
   return (
     <div className="flex flex-col gap-4">
-      <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-[1fr_200px]">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_200px]">
         <Field
           label="Namen (eine Person pro Zeile)"
           htmlFor="names"

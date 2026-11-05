@@ -1,5 +1,17 @@
 import Link from "next/link";
-import { ArrowRight, BellRing, Cake, CalendarDays, Clock, Megaphone, Pin, TriangleExclamationPoint, Vote } from "lucide-react";
+import {
+  ArrowRight,
+  BellRing,
+  Cake,
+  CalendarDays,
+  ClipboardList,
+  Clock,
+  Megaphone,
+  Pin,
+  ShoppingCart,
+  TriangleExclamationPoint,
+  Vote,
+} from "lucide-react";
 import { Countdown } from "@/components/countdown";
 import { PushPrompt } from "@/components/push";
 import { pushPublicKey } from "@/lib/push";
@@ -42,6 +54,17 @@ interface MyPledge {
   event_needs: { title: string; unit: string | null; event_id: string; events: { title: string; starts_at: string; ends_at: string | null } };
 }
 
+interface OrgaEvent {
+  event_id: string;
+  events: {
+    id: string;
+    title: string;
+    starts_at: string;
+    ends_at: string | null;
+    shopping_items: { bought_at: string | null; assigned_to: string | null }[];
+  };
+}
+
 interface UpcomingEvent {
   id: string;
   title: string;
@@ -61,7 +84,7 @@ export default async function DashboardPage() {
   const nowStr = new Date(now).toISOString();
   const weekAgo = new Date(now - 7 * 24 * HOUR).toISOString();
 
-  const [mySignupsRes, eventsRes, openShiftsRes, pollsRes, myVotesRes, newsRes, myPledgesRes] = await Promise.all([
+  const [mySignupsRes, eventsRes, openShiftsRes, pollsRes, myVotesRes, newsRes, myPledgesRes, orgaRes] = await Promise.all([
     supabase
       .from("shift_signups")
       .select(
@@ -95,7 +118,16 @@ export default async function DashboardPage() {
       .from("need_pledges")
       .select("id, quantity, event_needs!inner(title, unit, event_id, events!inner(title, starts_at, ends_at))")
       .eq("user_id", me.id),
+    supabase
+      .from("event_organizers")
+      .select("event_id, events!inner(id, title, starts_at, ends_at, shopping_items(bought_at, assigned_to))")
+      .eq("user_id", me.id),
   ]);
+
+  const orgaEvents = ((orgaRes.data ?? []) as unknown as OrgaEvent[])
+    .map((o) => o.events)
+    .filter((e) => isUpcoming(e.starts_at, e.ends_at, now))
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
 
   const myShifts = ((mySignupsRes.data ?? []) as unknown as MyShift[])
     .filter((s) => s.shifts.events.published)
@@ -165,7 +197,7 @@ export default async function DashboardPage() {
       ) : null}
 
       {/* Nächste eigene Schicht + eigene Einträge */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <Card className="overflow-hidden md:col-span-3">
           {nextShift ? (
             <div className="flex h-full flex-col gap-4 bg-linear-to-br from-primary to-primary/80 p-5 text-primary-foreground">
@@ -247,11 +279,45 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
+      {/* Orga-Team */}
+      {orgaEvents.length > 0 ? (
+        <section>
+          <SectionTitle>Du bist im Orga-Team</SectionTitle>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {orgaEvents.map((e) => {
+              const total = e.shopping_items.length;
+              const bought = e.shopping_items.filter((i) => i.bought_at).length;
+              const mine = e.shopping_items.filter((i) => !i.bought_at && i.assigned_to === me.id).length;
+              return (
+                <Link
+                  key={e.id}
+                  href={`/termine/${e.id}/verwalten`}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+                >
+                  <ClipboardList className="size-5 shrink-0 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{e.title}</p>
+                    <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                      <span>{formatDateShort(e.starts_at)}</span>
+                      <span className="inline-flex items-center gap-1">
+                        <ShoppingCart className="size-3" /> {bought}/{total} besorgt
+                      </span>
+                      {mine > 0 ? <span className="font-semibold text-primary">{mine} für dich</span> : null}
+                    </p>
+                  </div>
+                  <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
       {/* Offene Abstimmungen */}
       {openPolls.length > 0 ? (
         <section>
           <SectionTitle>Deine Stimme fehlt noch</SectionTitle>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {openPolls.slice(0, 4).map((p) => (
               <Link
                 key={p.id}
@@ -272,7 +338,7 @@ export default async function DashboardPage() {
         </section>
       ) : null}
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {/* Nächste Termine */}
         <section>
           <SectionTitle
@@ -363,7 +429,7 @@ export default async function DashboardPage() {
         {news.length === 0 ? (
           <EmptyState icon={<Megaphone className="size-6" />} title="Noch keine Neuigkeiten" />
         ) : (
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {news.map((n) => (
               <Card key={n.id}>
                 <CardHeader>

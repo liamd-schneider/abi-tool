@@ -1,12 +1,12 @@
 import { ActionForm, Hidden, SubmitButton } from "@/components/action-form";
 import { Checkbox, Field, Input, Textarea } from "@/components/ui/input";
-import { saveEvent } from "@/actions/admin";
+import { saveEvent } from "@/actions/event";
 import { toLocalInput } from "@/lib/dates";
 import type { EventRow } from "@/lib/types";
 
-export function EventForm({ event }: { event?: EventRow }) {
+export function EventForm({ event, canPublish = true }: { event?: EventRow; canPublish?: boolean }) {
   return (
-    <ActionForm action={saveEvent} className="grid gap-4 sm:grid-cols-2">
+    <ActionForm action={saveEvent} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Hidden name="id" value={event?.id} />
       <Field label="Titel *" htmlFor="title" className="sm:col-span-2">
         <Input id="title" name="title" defaultValue={event?.title} required maxLength={200} placeholder="z. B. Waffelverkauf in der großen Pause" />
@@ -42,12 +42,14 @@ export function EventForm({ event }: { event?: EventRow }) {
       >
         <Textarea id="notes" name="notes" rows={3} defaultValue={event?.notes ?? ""} />
       </Field>
-      <Checkbox
-        name="published"
-        defaultChecked={event?.published ?? false}
-        label="Veröffentlichen (für alle sichtbar – alle bekommen eine Benachrichtigung)"
-        className="sm:col-span-2"
-      />
+      {canPublish ? (
+        <Checkbox
+          name="published"
+          defaultChecked={event?.published ?? false}
+          label="Veröffentlichen (für alle sichtbar – alle bekommen eine Benachrichtigung)"
+          className="sm:col-span-2"
+        />
+      ) : null}
       <div className="sm:col-span-2">
         <SubmitButton>{event ? "Änderungen speichern" : "Termin anlegen"}</SubmitButton>
       </div>

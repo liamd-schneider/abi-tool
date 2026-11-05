@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Megaphone,
   Rocket,
+  ShoppingCart,
   Users,
   Vote,
   X,
@@ -39,7 +40,7 @@ const STEPS: Step[] = [
     href: "/admin",
     icon: LayoutDashboard,
     title: "Willkommen im Admin-Bereich",
-    intro: "In 8 kurzen Schritten zeige ich dir, wie du das Abi-Tool einrichtest. Die Seite im Hintergrund wechselt automatisch mit.",
+    intro: "In ein paar kurzen Schritten zeige ich dir, wie du das Abi-Tool einrichtest. Die Seite im Hintergrund wechselt automatisch mit.",
     points: [
       <>
         Die <b>Übersicht</b> zeigt dir auf einen Blick: freie Schichtplätze, fehlende Spenden, die letzten Eintragungen und wer
@@ -110,9 +111,27 @@ const STEPS: Step[] = [
     ],
   },
   {
+    href: "/admin/termine",
+    icon: ShoppingCart,
+    title: "4 · Orga-Team & Einkaufsliste",
+    intro: "Jeder Termin kann ein eigenes Orga-Team haben, das dir Arbeit abnimmt.",
+    points: [
+      <>
+        Im Termin unter <b>Orga-Team</b> Leute hinzufügen und <b>jedes Mal auswählen, was sie dürfen</b>: Einkaufsliste,
+        Schichten, Spenden & Material, Sortiment oder Termindaten.
+      </>,
+      <>Veröffentlichen, Löschen und das Orga-Team selbst bleiben immer bei den Admins.</>,
+      <>
+        Die <b>Einkaufsliste</b> sehen nur Admins und das Orga-Team: Artikel eintragen, festlegen wer kauft, abhaken wenn
+        besorgt, Betrag eintragen – die Summe wird automatisch berechnet.
+      </>,
+      <>Das Orga-Team findet seine Termine auf der Startseite unter „Du bist im Orga-Team“.</>,
+    ],
+  },
+  {
     href: "/admin/neuigkeiten",
     icon: Megaphone,
-    title: "4 · Neuigkeiten",
+    title: "5 · Neuigkeiten",
     intro: "Infos an den ganzen Jahrgang – ohne dass sie im Gruppenchat untergehen.",
     points: [
       <>Alle bekommen eine Benachrichtigung, mit aktiviertem Push auch direkt aufs Handy.</>,
@@ -124,7 +143,7 @@ const STEPS: Step[] = [
   {
     href: "/admin/abstimmungen",
     icon: Vote,
-    title: "5 · Abstimmungen",
+    title: "6 · Abstimmungen",
     intro: "Funktioniert wie eine WhatsApp-Umfrage.",
     points: [
       <>
@@ -139,7 +158,7 @@ const STEPS: Step[] = [
   {
     href: "/admin/statistik",
     icon: ChartColumn,
-    title: "6 · Statistik",
+    title: "7 · Statistik",
     intro: "Wer hat wie viel gemacht?",
     points: [
       <>

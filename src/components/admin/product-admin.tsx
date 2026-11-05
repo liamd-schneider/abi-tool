@@ -1,7 +1,8 @@
 import { Pencil, Plus, Trash } from "lucide-react";
 import { ActionForm, Hidden, SubmitButton } from "@/components/action-form";
 import { Field, Input } from "@/components/ui/input";
-import { deleteProduct, saveProduct } from "@/actions/admin";
+import { AddPanel } from "@/components/ui/misc";
+import { deleteProduct, saveProduct } from "@/actions/event";
 import type { ProductRow } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 
@@ -48,7 +49,7 @@ export function ProductAdmin({ eventId, products }: { eventId: string; products:
                 <summary className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-primary">
                   <Pencil className="size-3" /> Bearbeiten
                 </summary>
-                <ActionForm action={saveProduct} className="mt-2 grid gap-3 sm:grid-cols-4">
+                <ActionForm action={saveProduct} className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-4">
                   <Hidden name="id" value={p.id} />
                   <ProductFields product={p} />
                   <div className="sm:col-span-4">
@@ -61,9 +62,8 @@ export function ProductAdmin({ eventId, products }: { eventId: string; products:
         </ul>
       ) : null}
 
-      <div className="rounded-xl border border-dashed border-border p-4">
-        <p className="mb-3 font-semibold">Zum Sortiment hinzufügen</p>
-        <ActionForm action={saveProduct} resetOnSuccess className="grid gap-3 sm:grid-cols-4">
+      <AddPanel title="Produkt zum Sortiment hinzufügen" defaultOpen={products.length === 0}>
+        <ActionForm action={saveProduct} resetOnSuccess className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           <Hidden name="event_id" value={eventId} />
           <ProductFields />
           <div className="sm:col-span-4">
@@ -72,7 +72,7 @@ export function ProductAdmin({ eventId, products }: { eventId: string; products:
             </SubmitButton>
           </div>
         </ActionForm>
-      </div>
+      </AddPanel>
     </div>
   );
 }

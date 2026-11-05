@@ -51,7 +51,7 @@ export default async function AdminPollsPage() {
         {polls.length === 0 ? (
           <EmptyState title="Noch keine Abstimmungen" />
         ) : (
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {polls.map((p) => {
               const rows = resultMap.get(p.id) ?? [];
               const voters = Number(rows[0]?.voters ?? 0);

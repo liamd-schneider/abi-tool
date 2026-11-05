@@ -99,7 +99,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
                     </div>
                   </div>
                   {slots > 0 || needed > 0 ? (
-                    <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                       {slots > 0 ? (
                         <div className="flex items-center gap-2">
                           <Clock className="size-3.5" />

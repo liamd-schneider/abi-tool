@@ -79,7 +79,7 @@ export default async function NeedsPage({ searchParams }: { searchParams: Promis
                 </Link>
                 <p className="text-sm text-muted-foreground">{formatRange(event.starts_at, event.ends_at)}</p>
               </div>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {list.map((n) => (
                   <NeedCard key={n.id} need={n} meId={me.id} event={{ id: event.id, title: event.title }} />
                 ))}

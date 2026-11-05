@@ -6,7 +6,17 @@ import { addComment, deleteComment } from "@/actions/member";
 import { formatStamp } from "@/lib/dates";
 import type { CommentRow, Profile } from "@/lib/types";
 
-export function Comments({ eventId, comments, me }: { eventId: string; comments: CommentRow[]; me: Profile }) {
+export function Comments({
+  eventId,
+  comments,
+  me,
+  canModerate,
+}: {
+  eventId: string;
+  comments: CommentRow[];
+  me: Profile;
+  canModerate: boolean;
+}) {
   return (
     <div className="flex flex-col gap-4">
       {comments.length === 0 ? (
@@ -22,7 +32,7 @@ export function Comments({ eventId, comments, me }: { eventId: string; comments:
                     {c.profiles?.full_name ?? "Unbekannt"}{" "}
                     <span className="font-normal text-muted-foreground">· {formatStamp(c.created_at)}</span>
                   </p>
-                  {c.user_id === me.id || me.role === "admin" ? (
+                  {c.user_id === me.id || canModerate ? (
                     <ActionForm action={deleteComment} confirm="Anmerkung löschen?">
                       <Hidden name="id" value={c.id} />
                       <SubmitButton variant="ghost" size="icon" className="size-7" aria-label="Löschen">

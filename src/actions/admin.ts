@@ -1,76 +1,21 @@
 "use server";
 
+// Aktionen, die ausschließlich Admins dürfen.
+// (Alles, was einen einzelnen Termin betrifft und auch das Orga-Team darf, liegt in ./event.ts)
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { after } from "next/server";
 import { requireAdmin, usernameToEmail } from "@/lib/auth";
-import { dispatchPendingPushesSafe } from "@/lib/push";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { bool, dbError, int, num, optStr, str } from "@/lib/forms";
 import { fromLocalInput } from "@/lib/dates";
-import { safeUrl } from "@/lib/utils";
+import { isEventPermission } from "@/lib/event-permissions";
+import { bool, dbError, optStr, str } from "@/lib/forms";
+import { refreshAll as refresh } from "@/lib/refresh";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import type { ActionState, Role } from "@/lib/types";
 import { generatePassword, makeUsername, parseNameLine } from "@/lib/usernames";
-import type { ActionState, NeedKind, Role } from "@/lib/types";
-
-/** Seiten neu laden + neu entstandene Benachrichtigungen (DB-Trigger) nach der Antwort als Push senden */
-const refresh = () => {
-  revalidatePath("/", "layout");
-  after(dispatchPendingPushesSafe);
-};
-
-function localTime(fd: FormData, key: string): string | null {
-  const value = str(fd, key);
-  if (!value) return null;
-  try {
-    return fromLocalInput(value);
-  } catch {
-    return null;
-  }
-}
 
 // =================================================================== Termine
-
-export async function saveEvent(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  const me = await requireAdmin();
-  const id = optStr(fd, "id");
-  const title = str(fd, "title");
-  const starts_at = localTime(fd, "starts_at");
-  const ends_at = localTime(fd, "ends_at");
-
-  if (!title) return { error: "Bitte einen Titel angeben." };
-  if (!starts_at) return { error: "Bitte Datum und Uhrzeit des Beginns angeben." };
-  if (ends_at && ends_at < starts_at) return { error: "Das Ende liegt vor dem Beginn." };
-
-  const rawMaps = optStr(fd, "maps_url");
-  const maps_url = rawMaps ? safeUrl(rawMaps) : null;
-  if (rawMaps && !maps_url) return { error: "Der Maps-Link muss mit https:// beginnen." };
-
-  const payload = {
-    title,
-    description: optStr(fd, "description"),
-    starts_at,
-    ends_at,
-    location_name: optStr(fd, "location_name"),
-    address: optStr(fd, "address"),
-    maps_url,
-    notes: optStr(fd, "notes"),
-    published: bool(fd, "published"),
-  };
-
-  const supabase = await createClient();
-  if (id) {
-    const { error } = await supabase.from("events").update(payload).eq("id", id);
-    if (error) return dbError(error);
-    refresh();
-    return { ok: true, message: "Termin gespeichert." };
-  }
-
-  const { data, error } = await supabase.from("events").insert({ ...payload, created_by: me.id }).select("id").single();
-  if (error) return dbError(error);
-  refresh();
-  redirect(`/admin/termine/${data.id}`);
-}
 
 export async function setEventPublished(_prev: ActionState, fd: FormData): Promise<ActionState> {
   await requireAdmin();
@@ -91,198 +36,35 @@ export async function deleteEvent(_prev: ActionState, fd: FormData): Promise<Act
   redirect("/admin/termine");
 }
 
-// =================================================================== Schichten
+// =================================================================== Orga-Team
 
-export async function saveShift(_prev: ActionState, fd: FormData): Promise<ActionState> {
+export async function setOrganizer(_prev: ActionState, fd: FormData): Promise<ActionState> {
   await requireAdmin();
-  const id = optStr(fd, "id");
-  const title = str(fd, "title");
-  const starts_at = localTime(fd, "starts_at");
-  const ends_at = localTime(fd, "ends_at");
-  const capacity = int(fd, "capacity", 1);
-
-  if (!title) return { error: "Bitte eine Bezeichnung angeben (z. B. Kasse, Aufbau)." };
-  if (!starts_at || !ends_at) return { error: "Bitte Beginn und Ende angeben." };
-  if (ends_at <= starts_at) return { error: "Das Ende muss nach dem Beginn liegen." };
-  if (capacity < 1) return { error: "Es muss mindestens 1 Person benötigt werden." };
-
-  const payload = { title, description: optStr(fd, "description"), starts_at, ends_at, capacity };
-  const supabase = await createClient();
-  const { error } = id
-    ? await supabase.from("shifts").update(payload).eq("id", id)
-    : await supabase.from("shifts").insert({ ...payload, event_id: str(fd, "event_id") });
-  if (error) return dbError(error);
-  refresh();
-  return { ok: true, message: id ? "Schicht gespeichert." : "Schicht angelegt." };
-}
-
-/** Mehrere aufeinanderfolgende Schichtblöcke erzeugen, z. B. 14–20 Uhr in 2-h-Blöcken */
-export async function generateShifts(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const title = str(fd, "title");
-  const from = localTime(fd, "from");
-  const to = localTime(fd, "to");
-  const blockMinutes = int(fd, "block_minutes", 120);
-  const capacity = int(fd, "capacity", 1);
-
-  if (!title) return { error: "Bitte eine Bezeichnung angeben." };
-  if (!from || !to || to <= from) return { error: "Bitte einen gültigen Zeitraum angeben." };
-  if (blockMinutes < 15) return { error: "Ein Block muss mindestens 15 Minuten lang sein." };
-
-  const rows = [];
-  const end = new Date(to).getTime();
-  for (let t = new Date(from).getTime(); t < end; t += blockMinutes * 60_000) {
-    rows.push({
-      event_id: str(fd, "event_id"),
-      title,
-      description: optStr(fd, "description"),
-      starts_at: new Date(t).toISOString(),
-      ends_at: new Date(Math.min(t + blockMinutes * 60_000, end)).toISOString(),
-      capacity,
-    });
-    if (rows.length > 60) return { error: "Das wären zu viele Blöcke (max. 60)." };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("shifts").insert(rows);
-  if (error) return dbError(error);
-  refresh();
-  return { ok: true, message: `${rows.length} Schichten angelegt.` };
-}
-
-export async function deleteShift(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const supabase = await createClient();
-  const { error } = await supabase.from("shifts").delete().eq("id", str(fd, "id"));
-  if (error) return dbError(error);
-  refresh();
-  return { ok: true, message: "Schicht gelöscht – Eingetragene wurden benachrichtigt." };
-}
-
-export async function adminAddSignup(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireAdmin();
+  const eventId = str(fd, "event_id");
   const userId = str(fd, "user_id");
   if (!userId) return { error: "Bitte eine Person auswählen." };
+  const permissions = [...new Set(fd.getAll("permission").filter(isEventPermission))];
+
   const supabase = await createClient();
-  const { error } = await supabase.from("shift_signups").insert({ shift_id: str(fd, "shift_id"), user_id: userId });
-  if (error) return dbError(error, { "23505": "Die Person ist schon eingetragen." });
+  const { error } = await supabase
+    .from("event_organizers")
+    .upsert({ event_id: eventId, user_id: userId, permissions }, { onConflict: "event_id,user_id" });
+  if (error) return dbError(error);
   refresh();
-  return { ok: true, message: "Person eingetragen." };
+  return { ok: true, message: fd.has("is_update") ? "Rechte gespeichert." : "Zum Orga-Team hinzugefügt – Person wurde benachrichtigt." };
 }
 
-export async function adminRemoveSignup(_prev: ActionState, fd: FormData): Promise<ActionState> {
+export async function removeOrganizer(_prev: ActionState, fd: FormData): Promise<ActionState> {
   await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase
-    .from("shift_signups")
+    .from("event_organizers")
     .delete()
-    .eq("shift_id", str(fd, "shift_id"))
+    .eq("event_id", str(fd, "event_id"))
     .eq("user_id", str(fd, "user_id"));
   if (error) return dbError(error);
   refresh();
-  return { ok: true, message: "Person ausgetragen." };
-}
-
-export async function setAttendance(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const value = str(fd, "attended");
-  const attended = value === "true" ? true : value === "false" ? false : null;
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("shift_signups")
-    .update({ attended })
-    .eq("shift_id", str(fd, "shift_id"))
-    .eq("user_id", str(fd, "user_id"));
-  if (error) return dbError(error);
-  refresh();
-  return { ok: true };
-}
-
-// =================================================================== Bedarf (Spenden, Leihgaben, Material)
-
-const NEED_KINDS: NeedKind[] = ["spende", "leihgabe", "material"];
-
-export async function saveNeed(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const id = optStr(fd, "id");
-  const title = str(fd, "title");
-  const kind = str(fd, "kind") as NeedKind;
-  const quantity_needed = int(fd, "quantity_needed", 1);
-
-  if (!title) return { error: "Bitte angeben, was benötigt wird." };
-  if (!NEED_KINDS.includes(kind)) return { error: "Ungültige Art." };
-  if (quantity_needed < 1) return { error: "Die Menge muss mindestens 1 sein." };
-
-  const payload = { title, kind, quantity_needed, unit: optStr(fd, "unit"), description: optStr(fd, "description") };
-  const supabase = await createClient();
-  const { error } = id
-    ? await supabase.from("event_needs").update(payload).eq("id", id)
-    : await supabase.from("event_needs").insert({ ...payload, event_id: str(fd, "event_id") });
-  if (error) return dbError(error);
-  refresh();
-  return { ok: true, message: id ? "Gespeichert." : "Hinzugefügt." };
-}
-
-export async function deleteNeed(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const supabase = await createClient();
-  const { error } = await supabase.from("event_needs").delete().eq("id", str(fd, "id"));
-  if (error) return dbError(error);
-  refresh();
-  return { ok: true, message: "Gelöscht." };
-}
-
-export async function setDelivered(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const value = str(fd, "delivered");
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("need_pledges")
-    .update({ delivered: value === "true" ? true : value === "false" ? false : null })
-    .eq("id", str(fd, "id"));
-  if (error) return dbError(error);
-  refresh();
-  return { ok: true };
-}
-
-export async function adminRemovePledge(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const supabase = await createClient();
-  const { error } = await supabase.from("need_pledges").delete().eq("id", str(fd, "id"));
-  if (error) return dbError(error);
-  refresh();
-  return { ok: true, message: "Eintrag entfernt." };
-}
-
-// =================================================================== Sortiment
-
-export async function saveProduct(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const id = optStr(fd, "id");
-  const name = str(fd, "name");
-  if (!name) return { error: "Bitte einen Namen angeben." };
-  const payload = {
-    name,
-    price: num(fd, "price"),
-    description: optStr(fd, "description"),
-    sort_order: int(fd, "sort_order", 0),
-  };
-  const supabase = await createClient();
-  const { error } = id
-    ? await supabase.from("event_products").update(payload).eq("id", id)
-    : await supabase.from("event_products").insert({ ...payload, event_id: str(fd, "event_id") });
-  if (error) return dbError(error);
-  refresh();
-  return { ok: true, message: id ? "Gespeichert." : "Zum Sortiment hinzugefügt." };
-}
-
-export async function deleteProduct(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const supabase = await createClient();
-  const { error } = await supabase.from("event_products").delete().eq("id", str(fd, "id"));
-  if (error) return dbError(error);
-  refresh();
-  return { ok: true, message: "Entfernt." };
+  return { ok: true, message: "Aus dem Orga-Team entfernt." };
 }
 
 // =================================================================== Mitglieder
@@ -472,7 +254,12 @@ export async function createPoll(_prev: ActionState, fd: FormData): Promise<Acti
     .map((o) => String(o).trim())
     .filter(Boolean);
   const closesRaw = str(fd, "closes_at");
-  const closes_at = closesRaw ? fromLocalInput(closesRaw) : null;
+  let closes_at: string | null = null;
+  try {
+    closes_at = closesRaw ? fromLocalInput(closesRaw) : null;
+  } catch {
+    return { error: "Ungültiges Enddatum." };
+  }
 
   if (!question) return { error: "Bitte eine Frage angeben." };
   if (options.length < 2) return { error: "Bitte mindestens zwei Antwortmöglichkeiten angeben." };

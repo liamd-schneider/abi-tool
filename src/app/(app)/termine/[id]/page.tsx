@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Info, Pencil } from "lucide-react";
+import { ArrowLeft, ClipboardList, Info, Pencil } from "lucide-react";
 import { CalendarButtons } from "@/components/calendar-buttons";
 import { Comments } from "@/components/comments";
 import { DateBlock, LocationLink } from "@/components/event-bits";
@@ -10,8 +10,9 @@ import { ShiftCard } from "@/components/shift-card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { EmptyState, Multiline, Notice, SectionTitle } from "@/components/ui/misc";
+import { EmptyState, Multiline, Notice, PersonChip, SectionTitle } from "@/components/ui/misc";
 import { requireUser } from "@/lib/auth";
+import { getEventAccess } from "@/lib/permissions";
 import { formatRange, isUpcoming, nowMs, relativeDay } from "@/lib/dates";
 import { EVENT_FIELDS, NEED_SELECT, SHIFT_SELECT } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -32,7 +33,7 @@ export default async function EventPage({ params }: Props) {
   const me = await requireUser();
   const supabase = await createClient();
 
-  const [eventRes, shiftsRes, needsRes, productsRes, commentsRes] = await Promise.all([
+  const [eventRes, shiftsRes, needsRes, productsRes, commentsRes, orgaRes, access] = await Promise.all([
     supabase.from("events").select(EVENT_FIELDS).eq("id", id).maybeSingle(),
     supabase.from("shifts").select(SHIFT_SELECT).eq("event_id", id).order("starts_at").order("title"),
     supabase.from("event_needs").select(NEED_SELECT).eq("event_id", id).order("created_at"),
@@ -42,9 +43,12 @@ export default async function EventPage({ params }: Props) {
       .select("id, event_id, user_id, body, created_at, profiles(full_name, username)")
       .eq("event_id", id)
       .order("created_at"),
+    supabase.from("event_organizers").select("user_id, profiles(full_name)").eq("event_id", id).order("created_at"),
+    getEventAccess(id),
   ]);
 
   const event = eventRes.data as EventRow | null;
+  const orga = (orgaRes.data ?? []) as unknown as { user_id: string; profiles: { full_name: string } | null }[];
   if (!event) notFound();
 
   const shifts = (shiftsRes.data ?? []) as unknown as ShiftWithSignups[];
@@ -66,6 +70,10 @@ export default async function EventPage({ params }: Props) {
             <Link href={`/admin/termine/${event.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
               <Pencil className="size-4" /> Bearbeiten
             </Link>
+          ) : access.isOrganizer ? (
+            <Link href={`/termine/${event.id}/verwalten`} className={buttonVariants({ size: "sm" })}>
+              <ClipboardList className="size-4" /> Verwalten
+            </Link>
           ) : null}
         </div>
 
@@ -84,8 +92,25 @@ export default async function EventPage({ params }: Props) {
               customMapsUrl={event.maps_url}
               className="mt-1 text-sm"
             />
+            {orga.length > 0 ? (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm">
+                <span className="text-muted-foreground">Orga-Team:</span>
+                {orga.map((o) => (
+                  <PersonChip key={o.user_id} name={o.profiles?.full_name ?? "?"} />
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
+
+        {access.isOrganizer && !access.isAdmin ? (
+          <Notice tone="info" icon={<ClipboardList className="size-5 text-primary" />}>
+            Du bist im Orga-Team dieses Termins.{" "}
+            <Link href={`/termine/${event.id}/verwalten`} className="font-semibold text-primary hover:underline">
+              Zur Einkaufsliste & Verwaltung →
+            </Link>
+          </Notice>
+        ) : null}
 
         {upcoming ? (
           <CalendarButtons
@@ -122,7 +147,7 @@ export default async function EventPage({ params }: Props) {
         {shifts.length === 0 ? (
           <EmptyState title="Für diesen Termin gibt es (noch) keine Schichten." />
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {shifts.map((s) => (
               <ShiftCard key={s.id} shift={s} meId={me.id} event={{ id: event.id, title: event.title, location }} />
             ))}
@@ -133,7 +158,7 @@ export default async function EventPage({ params }: Props) {
       {needs.length > 0 ? (
         <section id="dienste" className="scroll-mt-20">
           <SectionTitle>Spenden, Leihgaben & Material</SectionTitle>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {needs.map((n) => (
               <NeedCard key={n.id} need={n} meId={me.id} event={{ id: event.id, title: event.title }} closed={!upcoming} />
             ))}
@@ -162,7 +187,7 @@ export default async function EventPage({ params }: Props) {
 
       <section>
         <SectionTitle>Anmerkungen</SectionTitle>
-        <Comments eventId={event.id} comments={comments} me={me} />
+        <Comments eventId={event.id} comments={comments} me={me} canModerate={access.permissions.includes("details")} />
       </section>
     </div>
   );
