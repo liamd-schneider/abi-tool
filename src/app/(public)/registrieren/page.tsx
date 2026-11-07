@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { Turnstile } from "@/components/turnstile";
+import { turnstileEnabled } from "@/lib/security/turnstile";
+import { MIN_PASSWORD_LENGTH } from "@/lib/security/password";
 import { Rocket } from "lucide-react";
 import { ActionForm, Hidden, SubmitButton } from "@/components/action-form";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +17,8 @@ export const metadata: Metadata = { title: "Jahrgang registrieren" };
 
 export default async function RegisterPage() {
   if (await getCurrentProfile()) redirect("/start");
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const siteKey = turnstileEnabled() ? (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? null) : null;
   const year = new Date(nowMs()).getFullYear();
   const defaultYear = new Date(nowMs()).getMonth() >= 7 ? year + 1 : year; // ab August: Abi im nächsten Jahr
 
@@ -60,11 +66,11 @@ export default async function RegisterPage() {
             >
               <Input id="full_name" name="full_name" required maxLength={120} autoComplete="name" placeholder="Max Mustermann" />
             </Field>
-            <Field label="Passwort *" htmlFor="password">
-              <Input id="password" name="password" type="password" minLength={8} required autoComplete="new-password" />
+            <Field label="Passwort *" htmlFor="password" hint={`Mindestens ${MIN_PASSWORD_LENGTH} Zeichen, nicht dein Name.`}>
+              <Input id="password" name="password" type="password" minLength={10} required autoComplete="new-password" />
             </Field>
             <Field label="Passwort wiederholen *" htmlFor="confirm">
-              <Input id="confirm" name="confirm" type="password" minLength={8} required autoComplete="new-password" />
+              <Input id="confirm" name="confirm" type="password" minLength={10} required autoComplete="new-password" />
             </Field>
 
             <Checkbox
@@ -85,6 +91,9 @@ export default async function RegisterPage() {
                 </>
               }
             />
+            <div className="sm:col-span-2">
+              <Turnstile siteKey={siteKey} nonce={nonce} />
+            </div>
             <div className="sm:col-span-2">
               <SubmitButton size="lg" className="w-full">
                 <Rocket className="size-4" /> Jahrgang anlegen

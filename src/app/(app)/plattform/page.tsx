@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Building2, MousePointerClick, Pencil, Trash, Users } from "lucide-react";
+import { Building2, History, MousePointerClick, Pencil, ShieldAlert, Trash, Users } from "lucide-react";
 import { ActionForm, Hidden, SubmitButton } from "@/components/action-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox, Field, Input, Textarea } from "@/components/ui/input";
 import { AddPanel, PageHeader, SectionTitle } from "@/components/ui/misc";
-import { deletePartner, savePartner, setCohortActive } from "@/actions/platform";
+import { approveCohort, deletePartner, savePartner, setCohortActive } from "@/actions/platform";
+import { AUDIT_LABELS } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { formatStamp, nowMs } from "@/lib/dates";
 import { fetchAll } from "@/lib/stats";
@@ -21,8 +22,17 @@ interface CohortRow {
   name: string;
   slug: string;
   active: boolean;
+  pending: boolean;
   created_at: string;
   schools: { name: string; city: string | null } | null;
+}
+
+interface AuditRow {
+  id: number;
+  actor_name: string | null;
+  action: string;
+  target: string | null;
+  created_at: string;
 }
 
 function PartnerFields({ partner }: { partner?: Partner }) {
@@ -63,7 +73,7 @@ export default async function PlatformPage() {
   const since = new Date(nowMs() - 30 * 86_400_000).toISOString();
 
   const [{ data: cohortData }, { count: schoolCount }, profiles, { data: partnerData }, clicks] = await Promise.all([
-    admin.from("cohorts").select("id, name, slug, active, created_at, schools(name, city)").order("created_at", { ascending: false }),
+    admin.from("cohorts").select("id, name, slug, active, pending, created_at, schools(name, city)").order("created_at", { ascending: false }),
     admin.from("schools").select("id", { count: "exact", head: true }),
     fetchAll<{ cohort_id: string }>((from, to) => admin.from("profiles").select("cohort_id").range(from, to)),
     admin.from("partners").select("*").order("sort_order").order("name"),
@@ -72,7 +82,15 @@ export default async function PlatformPage() {
     ),
   ]);
 
-  const cohorts = (cohortData ?? []) as unknown as CohortRow[];
+  const cohorts = ((cohortData ?? []) as unknown as CohortRow[]).sort((a, b) => Number(b.pending) - Number(a.pending));
+  const day = new Date(nowMs() - 86_400_000).toISOString();
+  const [{ data: auditData }, { count: failedLogins }, { count: loginRequests }, { count: registrations }] = await Promise.all([
+    admin.from("audit_log").select("id, actor_name, action, target, created_at").order("created_at", { ascending: false }).limit(40),
+    admin.from("rate_limits").select("id", { count: "exact", head: true }).like("key", "login-fail:%").gte("created_at", day),
+    admin.from("rate_limits").select("id", { count: "exact", head: true }).like("key", "login-ip:%").gte("created_at", day),
+    admin.from("rate_limits").select("id", { count: "exact", head: true }).like("key", "register-ip:%").gte("created_at", day),
+  ]);
+  const auditRows = (auditData ?? []) as AuditRow[];
   const partners = (partnerData ?? []) as Partner[];
   const members = new Map<string, number>();
   for (const p of profiles) members.set(p.cohort_id, (members.get(p.cohort_id) ?? 0) + 1);
@@ -124,7 +142,15 @@ export default async function PlatformPage() {
                     {members.get(c.id) ?? 0} Mitglieder · seit {formatStamp(c.created_at)} · /j/{c.slug}
                   </p>
                 </div>
-                {c.active ? <Badge variant="success">aktiv</Badge> : <Badge variant="destructive">gesperrt</Badge>}
+                {c.pending ? (
+                  <ActionForm action={approveCohort}>
+                    <Hidden name="id" value={c.id} />
+                    <SubmitButton size="sm" variant="success">
+                      Freigeben
+                    </SubmitButton>
+                  </ActionForm>
+                ) : null}
+                {c.pending ? <Badge variant="warning">wartet</Badge> : c.active ? <Badge variant="success">aktiv</Badge> : <Badge variant="destructive">gesperrt</Badge>}
                 {c.id !== me.cohort_id ? (
                   <ActionForm
                     action={setCohortActive}
@@ -139,6 +165,50 @@ export default async function PlatformPage() {
                 ) : (
                   <span className="text-xs text-muted-foreground">dein Jahrgang</span>
                 )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </section>
+
+      <section>
+        <SectionTitle>Sicherheit (letzte 24 Stunden)</SectionTitle>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            { label: "Fehlgeschlagene Logins", value: failedLogins ?? 0 },
+            { label: "Login-Anfragen", value: loginRequests ?? 0 },
+            { label: "Registrierungsversuche", value: registrations ?? 0 },
+          ].map((t) => (
+            <Card key={t.label}>
+              <CardContent className="flex items-center gap-3 pt-4 sm:pt-4">
+                <ShieldAlert className="size-5 shrink-0 text-primary" />
+                <div>
+                  <p className="text-xl font-bold tabular-nums">{t.value}</p>
+                  <p className="text-xs text-muted-foreground">{t.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <SectionTitle>
+          <span className="inline-flex items-center gap-2">
+            <History className="size-5 text-primary" /> Protokoll (alle Jahrgänge)
+          </span>
+        </SectionTitle>
+        <Card>
+          <ul className="divide-y divide-border">
+            {auditRows.length === 0 ? <li className="px-4 py-3 text-sm text-muted-foreground">Noch keine Einträge.</li> : null}
+            {auditRows.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2 text-sm">
+                <span className="w-28 shrink-0 text-xs text-muted-foreground tabular-nums">{formatStamp(r.created_at)}</span>
+                <span className="min-w-0 flex-1">
+                  <b>{AUDIT_LABELS[r.action] ?? r.action}</b>
+                  {r.target ? <span className="text-muted-foreground"> · {r.target}</span> : null}
+                </span>
+                <span className="text-xs text-muted-foreground">{r.actor_name ?? "System"}</span>
               </li>
             ))}
           </ul>

@@ -38,7 +38,9 @@ export function dbError(error: DbError, messages: Partial<Record<string, string>
   if (error.code === "23505") return { error: "Das gibt es schon." };
   if (error.code === "42501") return { error: "Dafür fehlt die Berechtigung." };
   if (error.code === "23514") return { error: "Die Eingaben sind ungültig (z. B. Ende vor Beginn)." };
+  // Eigene, bewusst formulierte Meldungen aus den Datenbank-Triggern (raise exception)
   if (error.code === "P0001") return { error: error.message };
+  // Alles andere nur ins Server-Log – interne Details (Tabellen, Regeln) nie an den Browser geben
   console.error("DB-Fehler", error);
-  return { error: `Fehler: ${error.message}` };
+  return { error: "Das hat leider nicht geklappt. Bitte versuch es nochmal." };
 }

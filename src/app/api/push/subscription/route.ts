@@ -1,4 +1,6 @@
 import { getCurrentProfile } from "@/lib/auth";
+import { hitRateLimit } from "@/lib/security/rate-limit";
+import { isSameOrigin } from "@/lib/security/request-guard";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,8 +20,10 @@ function validEndpoint(value: unknown): value is string {
 
 /** Push-Abo dieses Geräts speichern (auch vom Service Worker bei Schlüsselwechsel aufgerufen) */
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) return Response.json({ error: "Ungültige Herkunft" }, { status: 403 });
   const me = await getCurrentProfile();
   if (!me) return Response.json({ error: "Nicht angemeldet" }, { status: 401 });
+  if (!(await hitRateLimit("push-subscribe", me.id, 30, 60 * 60))) return Response.json({ error: "Zu viele Anfragen" }, { status: 429 });
 
   const body = (await request.json().catch(() => null)) as SubscriptionBody | null;
   const p256dh = body?.keys?.p256dh;
@@ -46,6 +50,7 @@ export async function POST(request: Request) {
 
 /** Push auf diesem Gerät abschalten */
 export async function DELETE(request: Request) {
+  if (!isSameOrigin(request)) return Response.json({ error: "Ungültige Herkunft" }, { status: 403 });
   const me = await getCurrentProfile();
   if (!me) return Response.json({ error: "Nicht angemeldet" }, { status: 401 });
   const body = (await request.json().catch(() => null)) as SubscriptionBody | null;

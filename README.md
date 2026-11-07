@@ -122,3 +122,45 @@ npm run dev:staging         # App mit Test-DB starten
 npm run make-platform-admin -- vorname.nachname --jahrgang <kennung>
 ```
 Die Variablen aus `.env.staging.local` haben Vorrang vor `.env.local` – die Live-Datenbank wird dabei nicht angefasst.
+
+## Sicherheit (Branch `mehrschulen`)
+
+**Zugang**
+- Login-Cookies sind `httpOnly` + `SameSite=Lax` (+ `Secure` in Produktion) – Browser-Skripte kommen nicht an die Tokens.
+- **Zwei-Faktor-Anmeldung** (Authenticator-App, TOTP) für alle; **Pflicht für Plattform-Admins**, pro Jahrgang als Pflicht für Admins einschaltbar. Erzwungen in der App *und* in der Datenbank (`aal2` im JWT). Wiederherstellungscodes, falls auf dem Supabase-Server freigeschaltet; sonst setzen Admins die 2FA einer Person zurück.
+- **Brute-Force-Schutz**: max. 8 Fehlversuche pro Account und 40 Anfragen pro IP in 15 Minuten, max. 5 Registrierungen pro IP und Stunde. IPs werden nur gesalzen gehasht gespeichert.
+- **Passwörter**: mind. 10 Zeichen, keine Klassiker, nicht der eigene Name/die Schule, Abgleich mit bekannten Datenlecks über *Have I Been Pwned* (k-Anonymität – das Passwort verlässt nie den Server). Admin-Startpasswörter: 12 zufällige Zeichen.
+- Passwort ändern meldet alle anderen Geräte ab; Passwort-Reset durch Admins beendet alle Sitzungen der Person. „Auf allen Geräten abmelden“ im Profil.
+- Gefährliche Aktionen (Account löschen, Jahrgang löschen, 2FA ausschalten) verlangen das Passwort erneut.
+- Registrierung: Honeypot, Mindest-Ausfüllzeit, Rate-Limit und optional **Cloudflare Turnstile**. Optional **Freischaltung** neuer Jahrgänge durch Plattform-Admins (`REGISTRATION_MODE=approval`).
+
+**Daten**
+- Jeder Jahrgang ist per RLS abgeschottet; Admin-Rechte gelten nur im eigenen Jahrgang. Wo der Secret Key RLS umgeht, wird der Jahrgang im Code zusätzlich geprüft.
+- Spalten-Rechte: Kalender-Schlüssel anderer sind unsichtbar; Mitglieder/Admins können nur erlaubte Spalten ändern; „Erstellt von“ ist nicht fälschbar; jeder Jahrgang behält mindestens einen Admin.
+- `anon` hat keinerlei Rechte (auch nicht auf künftige Tabellen/Funktionen); Server-Funktionen (Rate-Limits, Wartung, Sitzungen beenden) nur für `service_role`.
+- **Audit-Protokoll** aller sicherheitsrelevanten Aktionen (Admin → Protokoll, Plattform → Protokoll).
+- **DSGVO**: „Meine Daten herunterladen“ (JSON), Account selbst löschen, ganzen Jahrgang löschen. Tägliche Bereinigung: Benachrichtigungen > 180 Tage, Partner-Klicks nach 90 Tagen anonymisiert, Protokoll > 400 Tage, Rate-Limit-Daten > 2 Tage.
+- Fehlermeldungen geben keine internen Datenbank-Details preis.
+
+**Browser & Server**
+- Strenge **Content-Security-Policy** mit Nonce pro Anfrage (`strict-dynamic`, kein `unsafe-eval` in Produktion, `object-src 'none'`, `frame-ancestors 'none'`, `form-action 'self'`).
+- HSTS (2 Jahre, preload), `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy, Permissions-Policy, COOP, kein `X-Powered-By`.
+- Schutz vor Open-Redirects, CSRF-Prüfung der eigenen API-Routen, zeitkonstanter Vergleich des Cron-Secrets, Partner-Klicks gegen Manipulation gedrosselt.
+- `/.well-known/security.txt` für Sicherheitsmeldungen.
+
+**Zusätzliche Umgebungsvariablen (alle optional)**
+
+| Variable | Wofür |
+|---|---|
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile auf der Registrierung (kostenlos bei Cloudflare) |
+| `REGISTRATION_MODE` | `open` (Standard) oder `approval` (Plattform-Admins schalten neue Jahrgänge frei) |
+| `RATE_LIMIT_SALT` | Salz für gehashte IPs/Benutzernamen (Standard: `CRON_SECRET`) |
+| `SECURITY_CONTACT` | E-Mail für `security.txt` (Standard: Link aufs Impressum) |
+
+**In Supabase einstellen (Dashboard)**
+1. Authentication → Sign In / Providers: „Allow new users to sign up“ **aus** (Accounts entstehen nur serverseitig).
+2. Authentication → Multi-Factor: **TOTP aktiviert** lassen.
+3. Authentication → Sessions/JWT: Access-Token-Laufzeit 3600 s (Standard) lassen.
+4. Authentication → Rate Limits: Standardwerte lassen.
+5. Wenn verfügbar (Pro): „Leaked password protection“ und Wiederherstellungscodes aktivieren, Point-in-Time-Backups einschalten.
+6. In Vercel alle Secrets als **Sensitive** markieren.

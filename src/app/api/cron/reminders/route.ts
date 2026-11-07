@@ -1,5 +1,6 @@
 import { formatTime, relativeDay } from "@/lib/dates";
 import { dispatchPendingPushes } from "@/lib/push";
+import { safeEqual } from "@/lib/security/request-guard";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Wird von Vercel Cron aufgerufen (siehe vercel.json): erinnert an Schichten in den nächsten 36 Stunden.
@@ -12,7 +13,7 @@ interface DueSignup {
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || !safeEqual(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -52,5 +53,9 @@ export async function GET(request: Request) {
   // Erinnerungen (und evtl. liegengebliebene Benachrichtigungen) als Push verschicken
   const pushed = await dispatchPendingPushes();
 
-  return Response.json({ reminded: due.length, pushed });
+  // Tägliche Datenbereinigung (alte Benachrichtigungen, Rate-Limits, Anonymisierung …)
+  const { data: maintenance, error: maintenanceError } = await admin.rpc("run_maintenance");
+  if (maintenanceError) console.error("Wartung", maintenanceError.message);
+
+  return Response.json({ reminded: due.length, pushed, maintenance });
 }

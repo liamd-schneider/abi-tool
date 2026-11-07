@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, EmptyState, PageHeader, PersonChip, SectionTitle } from "@/components/ui/misc";
 import { SetupChecklist } from "@/components/admin/setup-checklist";
-import { getCurrentCohort, requireAdmin } from "@/lib/auth";
+import { getAal, getCurrentCohort, requireAdmin } from "@/lib/auth";
 import { formatDateShort, formatRange, formatStamp, formatTimeRange, isUpcoming, nowMs, relativeDay } from "@/lib/dates";
 import { loadLastSignIns } from "@/lib/login-status";
 import { Progress } from "@/components/ui/progress";
@@ -39,7 +39,7 @@ interface Activity {
 
 export default async function AdminOverviewPage() {
   const me = await requireAdmin();
-  const cohort = await getCurrentCohort();
+  const [cohort, aal] = await Promise.all([getCurrentCohort(), getAal()]);
   const supabase = await createClient();
   const now = nowMs();
   const weekAgo = new Date(now - 7 * 86_400_000).toISOString();
@@ -164,6 +164,12 @@ export default async function AdminOverviewPage() {
       hint: "z. B. „Willkommen im Abi-Tool!“",
       href: "/admin/neuigkeiten",
       done: (allNews.count ?? 0) + (allPolls.count ?? 0) > 0,
+    },
+    {
+      label: "Zwei-Faktor-Anmeldung für dich aktivieren",
+      hint: "Empfohlen für alle Admins – schützt euren Jahrgang, falls dein Passwort bekannt wird.",
+      href: "/profil#sicherheit",
+      done: aal.next === "aal2",
     },
     {
       label: "Push auf deinem Handy aktivieren",

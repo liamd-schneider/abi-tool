@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { KeyRound, Link2, RefreshCw, School } from "lucide-react";
-import { ActionForm, SubmitButton } from "@/components/action-form";
+import { KeyRound, Link2, RefreshCw, School, ShieldCheck, Trash } from "lucide-react";
+import { ActionForm, Hidden, SubmitButton } from "@/components/action-form";
 import { CopyButton } from "@/components/copy-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/misc";
-import { regenerateJoinCode, saveCohortSettings } from "@/actions/admin";
-import { getCurrentCohort, requireAdmin } from "@/lib/auth";
+import { deleteCohort, regenerateJoinCode, saveCohortSettings, setRequireAdmin2fa } from "@/actions/admin";
+import { getAal, getCurrentCohort, requireAdmin } from "@/lib/auth";
+import { Badge } from "@/components/ui/badge";
 import { getOrigin } from "@/lib/request";
 
 export const metadata: Metadata = { title: "Jahrgang" };
@@ -16,6 +17,7 @@ export default async function CohortSettingsPage() {
   const cohort = await getCurrentCohort();
   if (!cohort) return null;
   const loginLink = `${await getOrigin()}/j/${cohort.slug}`;
+  const myAal = (await getAal()).current;
 
   return (
     <div className="flex flex-col gap-6">
@@ -88,6 +90,69 @@ export default async function CohortSettingsPage() {
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <KeyRound className="size-3.5" /> Interne Kennung: {cohort.slug}
       </p>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="size-5 text-primary" /> Zwei-Faktor-Anmeldung für Admins
+            {cohort.require_admin_2fa ? <Badge variant="success">Pflicht</Badge> : <Badge variant="muted">freiwillig</Badge>}
+          </CardTitle>
+          <CardDescription>
+            Wenn Pflicht: Admin-Rechte gelten nur in Sitzungen, die mit Authenticator-App bestätigt wurden – auch direkt in der
+            Datenbank. Schützt euren Jahrgang, falls ein Admin-Passwort in falsche Hände gerät.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          {!cohort.require_admin_2fa && myAal !== "aal2" ? (
+            <p className="text-sm text-muted-foreground">
+              Richte zuerst selbst die Zwei-Faktor-Anmeldung im{" "}
+              <a href="/profil#sicherheit" className="font-medium text-primary hover:underline">
+                Profil
+              </a>{" "}
+              ein.
+            </p>
+          ) : null}
+          <ActionForm
+            action={setRequireAdmin2fa}
+            confirm={
+              cohort.require_admin_2fa
+                ? "2FA-Pflicht für Admins wirklich ausschalten?"
+                : "2FA für alle Admins verpflichtend machen? Admins ohne 2FA verlieren ihre Rechte, bis sie 2FA eingerichtet haben."
+            }
+          >
+            <Hidden name="enabled" value={!cohort.require_admin_2fa} />
+            <SubmitButton variant={cohort.require_admin_2fa ? "outline" : "primary"} size="sm" disabled={!cohort.require_admin_2fa && myAal !== "aal2"}>
+              {cohort.require_admin_2fa ? "Pflicht ausschalten" : "Für alle Admins verpflichtend machen"}
+            </SubmitButton>
+          </ActionForm>
+        </CardContent>
+      </Card>
+
+      <details className="rounded-xl border border-destructive/40 bg-card">
+        <summary className="flex cursor-pointer items-center gap-2 p-4 font-semibold text-destructive">
+          <Trash className="size-4" /> Jahrgang endgültig löschen
+        </summary>
+        <div className="border-t border-border p-4">
+          <p className="mb-3 text-sm text-muted-foreground">
+            Löscht den Jahrgang mit <b>allen Accounts</b>, Terminen, Schichten, Spenden, Abstimmungen und Nachrichten – z. B. nach dem
+            Abi. Das lässt sich nicht rückgängig machen.
+          </p>
+          <ActionForm
+            action={deleteCohort}
+            confirm="Wirklich ALLES endgültig löschen? Alle Mitglieder verlieren sofort ihren Zugang."
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+          >
+            <Field label={`Zur Bestätigung „${cohort.name}“ eintippen`} htmlFor="cohort-confirm">
+              <Input id="cohort-confirm" name="confirm" required autoComplete="off" />
+            </Field>
+            <Field label="Dein Passwort" htmlFor="cohort-password">
+              <Input id="cohort-password" name="password" type="password" required autoComplete="current-password" />
+            </Field>
+            <div className="sm:col-span-2">
+              <SubmitButton variant="destructive">Jahrgang endgültig löschen</SubmitButton>
+            </div>
+          </ActionForm>
+        </div>
+      </details>
     </div>
   );
 }

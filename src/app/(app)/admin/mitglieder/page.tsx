@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Avatar, PageHeader, SectionTitle } from "@/components/ui/misc";
-import { deleteMember, renameMember, setRole } from "@/actions/admin";
+import { deleteMember, renameMember, resetMemberMfa, setRole } from "@/actions/admin";
 import { requireAdmin } from "@/lib/auth";
 import { formatHours, formatStamp } from "@/lib/dates";
 import Link from "next/link";
@@ -123,6 +123,14 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
                     </ActionForm>
                     <div className="flex flex-wrap items-start gap-2">
                       <ResetPasswordForm userId={m.id} name={m.full_name} />
+                      {m.id !== me.id ? (
+                        <ActionForm action={resetMemberMfa} confirm={`Zwei-Faktor-Anmeldung von ${m.full_name} zurücksetzen? Nur machen, wenn die Person das Handy verloren hat.`}>
+                          <Hidden name="user_id" value={m.id} />
+                          <SubmitButton variant="outline" size="sm">
+                            2FA zurücksetzen
+                          </SubmitButton>
+                        </ActionForm>
+                      ) : null}
                       {m.id !== me.id ? (
                         <>
                           <ActionForm action={setRole}>

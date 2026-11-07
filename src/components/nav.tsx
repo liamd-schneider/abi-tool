@@ -18,6 +18,7 @@ const ADMIN_ITEMS = [
   { href: "/admin/termine", label: "Termine & Schichten" },
   { href: "/admin/mitglieder", label: "Mitglieder" },
   { href: "/admin/jahrgang", label: "Jahrgang" },
+  { href: "/admin/protokoll", label: "Protokoll" },
   { href: "/admin/neuigkeiten", label: "Neuigkeiten" },
   { href: "/admin/abstimmungen", label: "Abstimmungen" },
   { href: "/admin/statistik", label: "Statistik" },

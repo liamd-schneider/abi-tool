@@ -28,6 +28,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     .eq("calendar_token", token)
     .maybeSingle();
   if (!profile) return new Response("Ungültiger Link", { status: 404 });
+  // Gesperrte oder noch nicht freigeschaltete Jahrgänge liefern nichts
+  const { data: cohort } = await admin.from("cohorts").select("active, pending").eq("id", profile.cohort_id).maybeSingle();
+  if (!cohort?.active || cohort.pending) return new Response("Ungültiger Link", { status: 404 });
 
   const since = new Date(Date.now() - 60 * 86_400_000).toISOString();
   const origin = new URL(request.url).origin;

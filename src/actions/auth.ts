@@ -2,9 +2,14 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { audit } from "@/lib/audit";
 import { requireUser, usernameToEmail } from "@/lib/auth";
+import { rememberCohort } from "@/lib/cohort-cookie";
 import { COHORT_COOKIE, findCohort, type CohortLookup } from "@/lib/cohorts";
 import { str } from "@/lib/forms";
+import { safeNextPath } from "@/lib/safe-path";
+import { checkNewPassword } from "@/lib/security/password";
+import { clearRateLimit, clientIp, hitRateLimit, recordRateLimit, underRateLimit } from "@/lib/security/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
@@ -12,26 +17,25 @@ import { normalizeUsernameInput } from "@/lib/usernames";
 
 export type LoginState = ActionState<{ needCode?: boolean }>;
 
-/** Jahrgang auf diesem Gerät merken (für den nächsten Login) */
-export async function rememberCohort(slug: string) {
-  (await cookies()).set(COHORT_COOKIE, slug, {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 400,
-  });
-}
+// Fehlversuche pro Account: 8 in 15 Minuten; Anfragen pro IP: 40 in 15 Minuten
+const ACCOUNT_LIMIT = 8;
+const IP_LIMIT = 40;
+const WINDOW = 15 * 60;
 
 export async function forgetCohort() {
   (await cookies()).delete(COHORT_COOKIE);
 }
 
 export async function login(_prev: LoginState, fd: FormData): Promise<LoginState> {
-  const username = normalizeUsernameInput(str(fd, "username"));
-  const password = String(fd.get("password") ?? "");
-  const cohortRef = str(fd, "cohort");
+  const username = normalizeUsernameInput(str(fd, "username")).slice(0, 80);
+  const password = String(fd.get("password") ?? "").slice(0, 200);
+  const cohortRef = str(fd, "cohort").slice(0, 80);
   if (!username || !password) return { error: "Bitte Benutzername und Passwort eingeben." };
+
+  const ip = await clientIp();
+  if (!(await hitRateLimit("login-ip", ip, IP_LIMIT, WINDOW))) {
+    return { error: "Zu viele Anmeldeversuche von diesem Gerät. Bitte warte 15 Minuten." };
+  }
 
   let cohort: CohortLookup | null = null;
   if (cohortRef) {
@@ -59,21 +63,36 @@ export async function login(_prev: LoginState, fd: FormData): Promise<LoginState
   if (!cohort) return { error: "Benutzername oder Passwort ist falsch." };
   if (!cohort.active) return { error: "Dieser Jahrgang ist gesperrt. Bitte wende dich an euer Abikomitee." };
 
+  // Brute-Force-Schutz pro Account
+  const accountKey = `${cohort.id}:${username}`;
+  if (!(await underRateLimit("login-fail", accountKey, ACCOUNT_LIMIT, WINDOW))) {
+    await audit("login.blocked", { actor: null, cohortId: cohort.id, target: username });
+    return { error: "Zu viele Fehlversuche für diesen Account. Bitte warte 15 Minuten oder frag euer Abikomitee." };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({
     email: usernameToEmail(username, cohort.email_domain),
     password,
   });
   if (error) {
+    await recordRateLimit("login-fail", accountKey);
     return {
       error: error.status === 429 ? "Zu viele Versuche – bitte kurz warten." : "Benutzername oder Passwort ist falsch.",
       data: cohortRef ? { needCode: true } : undefined,
     };
   }
 
+  await clearRateLimit("login-fail", accountKey);
   await rememberCohort(cohort.slug);
-  const next = str(fd, "next");
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/start");
+  const next = safeNextPath(str(fd, "next"));
+
+  // 2FA eingerichtet? Dann erst noch den Code abfragen
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+    redirect(`/login/2fa?next=${encodeURIComponent(next)}`);
+  }
+  redirect(next);
 }
 
 export async function logout() {
@@ -83,18 +102,24 @@ export async function logout() {
 }
 
 export async function changePassword(_prev: ActionState, fd: FormData): Promise<ActionState> {
-  await requireUser();
+  const me = await requireUser();
   const password = String(fd.get("password") ?? "");
   const confirm = String(fd.get("confirm") ?? "");
-  if (password.length < 8) return { error: "Das Passwort muss mindestens 8 Zeichen haben." };
   if (password !== confirm) return { error: "Die Passwörter stimmen nicht überein." };
+  const weak = await checkNewPassword(password, [me.full_name, me.username]);
+  if (weak) return { error: weak };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ password });
   if (error) {
     if (error.code === "same_password") return { error: "Das ist schon dein aktuelles Passwort." };
     if (error.code === "weak_password") return { error: "Das Passwort ist zu schwach." };
-    return { error: `Fehler: ${error.message}` };
+    if (error.code === "insufficient_aal") return { error: "Bitte melde dich zuerst mit deinem 2FA-Code an." };
+    console.error("Passwortänderung", error);
+    return { error: "Das Passwort konnte nicht geändert werden. Bitte versuch es nochmal." };
   }
-  return { ok: true, message: "Passwort geändert." };
+  // Alle anderen Geräte abmelden – falls jemand das alte Passwort kannte
+  await supabase.auth.signOut({ scope: "others" });
+  await audit("account.password_changed");
+  return { ok: true, message: "Passwort geändert – alle anderen Geräte wurden abgemeldet." };
 }

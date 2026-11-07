@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
+import { connection } from "next/server";
 import { AppToaster } from "@/components/toaster";
 import "./globals.css";
 
@@ -31,7 +32,9 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Immer pro Anfrage rendern: nur so bekommen alle Skripte den CSP-Nonce aus dem Proxy
+  await connection();
   return (
     <html lang="de" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col font-sans">

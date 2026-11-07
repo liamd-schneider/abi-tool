@@ -6,7 +6,6 @@ export interface Profile {
   username: string;
   full_name: string;
   role: Role;
-  calendar_token: string;
   admin_tour_done_at: string | null;
   cohort_id: string;
 }
@@ -18,6 +17,8 @@ export interface CohortInfo {
   slug: string;
   join_code: string;
   active: boolean;
+  pending: boolean;
+  require_admin_2fa: boolean;
   schools: { id: string; name: string; city: string | null } | null;
 }
 
