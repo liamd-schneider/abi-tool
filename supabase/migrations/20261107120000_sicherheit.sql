@@ -76,13 +76,9 @@ grant select on public.audit_log to authenticated;
 grant all on public.audit_log, public.rate_limits to service_role;
 
 -- ---------------------------------------------------------------------
---  Profile: Kalender-Schlüssel ist geheim, nur bestimmte Spalten änderbar
---  (vorher konnte jedes Mitglied die Kalender-Links der anderen auslesen)
+--  Eigener Kalender-Schlüssel per Funktion (die Spalten-Sperre auf profiles folgt erst
+--  beim Go-live in supabase/launch/nach-go-live.sql – die bisherige App liest die Spalte noch)
 -- ---------------------------------------------------------------------
-revoke select, insert, update, delete on public.profiles from authenticated;
-grant select (id, username, full_name, role, cohort_id, created_at, admin_tour_done_at) on public.profiles to authenticated;
-grant update (full_name, role, admin_tour_done_at) on public.profiles to authenticated;
-
 create function public.my_calendar_token()
 returns text language sql stable security definer set search_path = '' as $$
   select calendar_token from public.profiles where id = auth.uid();

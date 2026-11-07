@@ -60,6 +60,11 @@ begin
     update public.events        set cohort_id = v_cohort where cohort_id is null;
     update public.announcements set cohort_id = v_cohort where cohort_id is null;
     update public.polls         set cohort_id = v_cohort where cohort_id is null;
+
+    -- Übergang: Die bisherige App (ohne Jahrgänge) legt Profile ohne cohort_id an.
+    -- Bis die Mehrschulen-App live ist, landen sie automatisch im bestehenden Jahrgang.
+    -- Wird beim Go-live entfernt (supabase/launch/nach-go-live.sql).
+    execute format('alter table public.profiles alter column cohort_id set default %L::uuid', v_cohort);
   end if;
 end;
 $$;
