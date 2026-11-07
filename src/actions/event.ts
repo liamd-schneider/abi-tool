@@ -251,6 +251,24 @@ export async function deleteNeed(_prev: ActionState, fd: FormData): Promise<Acti
   return { ok: true, message: "Gelöscht." };
 }
 
+/** Jemanden "nach Zuruf" bei einer Spende eintragen – oder die Menge der Person ändern */
+export async function addPledgeFor(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const needId = str(fd, "need_id");
+  const denied = await guard(await eventIdOf("event_needs", needId), "bedarf");
+  if (denied) return denied;
+  const userId = str(fd, "user_id");
+  if (!userId) return { error: "Bitte eine Person auswählen." };
+  const quantity = Math.max(1, int(fd, "quantity", 1));
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("need_pledges")
+    .upsert({ need_id: needId, user_id: userId, quantity, note: optStr(fd, "note") }, { onConflict: "need_id,user_id" });
+  if (error) return dbError(error);
+  refreshAll();
+  return { ok: true, message: "Eingetragen." };
+}
+
 export async function setDelivered(_prev: ActionState, fd: FormData): Promise<ActionState> {
   const id = str(fd, "id");
   const denied = await guard(await eventIdOfPledge(id), "bedarf");

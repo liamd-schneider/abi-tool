@@ -1,5 +1,6 @@
 import { getCurrentProfile } from "@/lib/auth";
 import { formatDateTime, formatStamp, hoursBetween } from "@/lib/dates";
+import { loadLastSignIns } from "@/lib/login-status";
 import { fetchAll, loadMemberStats } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
 
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const stats = await loadMemberStats(supabase);
+  const [stats, lastSignIns] = await Promise.all([loadMemberStats(supabase), loadLastSignIns()]);
   const rows = stats.map((s) => [
     s.full_name,
     s.username,
@@ -77,6 +78,7 @@ export async function GET(request: Request) {
     s.pledges,
     s.pledgeItems,
     s.lastActivity ? formatStamp(s.lastActivity) : "",
+    lastSignIns.get(s.id) ? formatStamp(lastSignIns.get(s.id)!) : "noch nie",
   ]);
   return csvResponse(
     [
@@ -93,6 +95,7 @@ export async function GET(request: Request) {
         "Spenden/Dienste",
         "Menge gesamt",
         "Zuletzt aktiv",
+        "Letzter Login",
       ],
       ...rows,
     ],

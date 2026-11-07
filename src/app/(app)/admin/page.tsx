@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarDays, Cake, Clock, Plus, ShoppingCart, Users } from "lucide-react";
+import { CalendarDays, Cake, Clock, LogIn, Plus, ShoppingCart, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { Avatar, EmptyState, PageHeader, PersonChip, SectionTitle } from "@/comp
 import { SetupChecklist } from "@/components/admin/setup-checklist";
 import { requireAdmin } from "@/lib/auth";
 import { formatDateShort, formatRange, formatStamp, formatTimeRange, isUpcoming, nowMs, relativeDay } from "@/lib/dates";
+import { loadLastSignIns } from "@/lib/login-status";
+import { Progress } from "@/components/ui/progress";
 import { loadMemberStats } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
 
@@ -51,7 +53,7 @@ export default async function AdminOverviewPage() {
     supabase.from("push_subscriptions").select("id", head).eq("user_id", me.id),
   ]);
 
-  const [eventsRes, signupsRes, pledgesRes, stats] = await Promise.all([
+  const [eventsRes, signupsRes, pledgesRes, stats, lastSignIns] = await Promise.all([
     supabase
       .from("events")
       .select(
@@ -71,6 +73,7 @@ export default async function AdminOverviewPage() {
       .order("created_at", { ascending: false })
       .limit(15),
     loadMemberStats(supabase),
+    loadLastSignIns(),
   ]);
 
   const events = ((eventsRes.data ?? []) as unknown as OverviewEvent[]).filter((e) => isUpcoming(e.starts_at, e.ends_at, now));
@@ -164,6 +167,8 @@ export default async function AdminOverviewPage() {
   ];
 
   const inactive = stats.filter((s) => s.shiftsTotal === 0 && s.pledges === 0);
+  const neverLoggedIn = stats.filter((s) => !lastSignIns.get(s.id));
+  const loggedIn = stats.length - neverLoggedIn.length;
   const drafts = events.filter((e) => !e.published).length;
 
   const tiles = [
@@ -208,6 +213,38 @@ export default async function AdminOverviewPage() {
           </Link>
         ))}
       </div>
+
+      <section id="logins" className="scroll-mt-20">
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <LogIn className="size-4 text-primary" /> Schon eingeloggt: {loggedIn} von {stats.length}
+              </CardTitle>
+              <Link href="/admin/mitglieder?filter=nie" className="text-sm font-medium text-primary hover:underline">
+                Details
+              </Link>
+            </div>
+            <Progress value={loggedIn} max={stats.length} className="mt-2" />
+          </CardHeader>
+          <CardContent>
+            {neverLoggedIn.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Alle haben sich mindestens einmal eingeloggt.</p>
+            ) : (
+              <details open={neverLoggedIn.length <= 20}>
+                <summary className="cursor-pointer text-sm font-medium select-none">
+                  Noch nie eingeloggt ({neverLoggedIn.length})
+                </summary>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {neverLoggedIn.map((s) => (
+                    <PersonChip key={s.id} name={s.full_name} />
+                  ))}
+                </div>
+              </details>
+            )}
+          </CardContent>
+        </Card>
+      </section>
 
       <section id="fehlt" className="scroll-mt-20">
         <SectionTitle>Hier fehlt noch was</SectionTitle>

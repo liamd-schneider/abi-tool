@@ -9,21 +9,36 @@ import { Input } from "@/components/ui/input";
 import { Avatar, PageHeader, SectionTitle } from "@/components/ui/misc";
 import { deleteMember, renameMember, setRole } from "@/actions/admin";
 import { requireAdmin } from "@/lib/auth";
-import { formatHours } from "@/lib/dates";
+import { formatHours, formatStamp } from "@/lib/dates";
+import { loadLastSignIns } from "@/lib/login-status";
 import { loadMemberStats } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
+import { FilterTabs } from "../../filter-tabs";
 
 export const metadata: Metadata = { title: "Mitglieder" };
 
-export default async function MembersPage() {
+export default async function MembersPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const me = await requireAdmin();
+  const { filter = "alle" } = await searchParams;
   const supabase = await createClient();
-  const members = await loadMemberStats(supabase);
-  const admins = members.filter((m) => m.role === "admin").length;
+  const [allMembers, lastSignIns] = await Promise.all([loadMemberStats(supabase), loadLastSignIns()]);
+  const admins = allMembers.filter((m) => m.role === "admin").length;
+  const neverCount = allMembers.filter((m) => !lastSignIns.get(m.id)).length;
+
+  const members =
+    filter === "nie"
+      ? allMembers.filter((m) => !lastSignIns.get(m.id))
+      : filter === "eingeloggt"
+        ? allMembers.filter((m) => lastSignIns.get(m.id))
+        : allMembers;
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Mitglieder" description={`${members.length} Accounts · davon ${admins} Admins`} className="mb-0" />
+      <PageHeader
+        title="Mitglieder"
+        description={`${allMembers.length} Accounts · davon ${admins} Admins · ${allMembers.length - neverCount} schon eingeloggt`}
+        className="mb-0"
+      />
 
       <Card>
         <CardHeader>
@@ -39,7 +54,26 @@ export default async function MembersPage() {
 
       <section>
         <SectionTitle>Alle Mitglieder</SectionTitle>
+        <FilterTabs
+          basePath="/admin/mitglieder"
+          current={filter}
+          options={[
+            { value: "alle", label: `Alle (${allMembers.length})` },
+            { value: "nie", label: `Noch nie eingeloggt (${neverCount})` },
+            { value: "eingeloggt", label: `Schon eingeloggt (${allMembers.length - neverCount})` },
+          ]}
+        />
+        {filter === "nie" && neverCount > 0 ? (
+          <p className="mb-3 text-sm text-muted-foreground">
+            Tipp: Auf eine Person tippen → <b>Passwort zurücksetzen</b> und die neuen Zugangsdaten nochmal persönlich schicken.
+          </p>
+        ) : null}
         <Card>
+          {members.length === 0 ? (
+            <p className="p-4 text-sm text-muted-foreground">
+              {filter === "nie" ? "Alle haben sich schon mindestens einmal eingeloggt." : "Keine Einträge."}
+            </p>
+          ) : null}
           <ul className="divide-y divide-border">
             {members.map((m) => (
               <li key={m.id} className="px-4 py-3">
@@ -53,6 +87,11 @@ export default async function MembersPage() {
                       <p className="truncate text-xs text-muted-foreground">
                         @{m.username} · {m.shiftsTotal} Schichten · {formatHours(m.hoursDone + m.hoursPlanned)} · {m.pledges} Spenden
                       </p>
+                      {lastSignIns.get(m.id) ? (
+                        <p className="text-xs text-muted-foreground">Letzter Login: {formatStamp(lastSignIns.get(m.id)!)}</p>
+                      ) : (
+                        <p className="text-xs font-medium text-warning-foreground">Noch nie eingeloggt</p>
+                      )}
                     </div>
                     {m.role === "admin" ? <Badge>Admin</Badge> : null}
                     <Settings2 className="size-4 shrink-0 text-muted-foreground" />

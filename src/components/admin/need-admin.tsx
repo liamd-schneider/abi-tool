@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Field, Input, Select } from "@/components/ui/input";
 import { AddPanel, Avatar } from "@/components/ui/misc";
 import { Progress } from "@/components/ui/progress";
-import { deleteNeed, removePledge, saveNeed, setDelivered } from "@/actions/event";
+import { addPledgeFor, deleteNeed, removePledge, saveNeed, setDelivered } from "@/actions/event";
 import { formatStamp } from "@/lib/dates";
 import { NEED_KIND_LABEL, type NeedRow, type NeedWithPledges } from "@/lib/types";
 
@@ -36,9 +36,11 @@ function NeedFields({ need }: { need?: NeedRow }) {
   );
 }
 
-export function NeedAdmin({ need }: { need: NeedWithPledges }) {
+export function NeedAdmin({ need, members }: { need: NeedWithPledges; members: { id: string; full_name: string }[] }) {
   const pledged = need.need_pledges.reduce((s, p) => s + p.quantity, 0);
+  const remaining = Math.max(0, need.quantity_needed - pledged);
   const unit = need.unit ?? "";
+  const pledgedBy = new Map(need.need_pledges.map((p) => [p.user_id, p.quantity]));
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
@@ -64,8 +66,11 @@ export function NeedAdmin({ need }: { need: NeedWithPledges }) {
             <li key={p.id} className="flex items-center gap-2 py-1.5">
               <Avatar name={p.profiles?.full_name ?? "?"} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  {p.profiles?.full_name ?? "Unbekannt"} <span className="font-normal text-muted-foreground">· {p.quantity} {unit}</span>
+                <p className="flex min-w-0 items-baseline gap-1 text-sm font-medium">
+                  <span className="truncate">{p.profiles?.full_name ?? "Unbekannt"}</span>
+                  <span className="shrink-0 font-normal whitespace-nowrap text-muted-foreground">
+                    · {p.quantity} {unit}
+                  </span>
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
                   {formatStamp(p.created_at)}
@@ -94,6 +99,41 @@ export function NeedAdmin({ need }: { need: NeedWithPledges }) {
           ))}
         </ul>
       )}
+
+      {/* Nach Zuruf eintragen (z. B. aus der WhatsApp-Gruppe) */}
+      {remaining > 0 && members.length > 0 ? (
+        <ActionForm action={addPledgeFor} resetOnSuccess className="flex flex-wrap gap-2">
+          <Hidden name="need_id" value={need.id} />
+          <Select name="user_id" defaultValue="" required className="h-9 min-w-0 flex-1 basis-40 sm:text-sm" aria-label="Person eintragen">
+            <option value="" disabled>
+              Person eintragen …
+            </option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.full_name}
+                {pledgedBy.has(m.id) ? ` (hat ${pledgedBy.get(m.id)} – Menge ändern)` : ""}
+              </option>
+            ))}
+          </Select>
+          {need.quantity_needed > 1 ? (
+            <Input
+              name="quantity"
+              type="number"
+              min={1}
+              max={need.quantity_needed}
+              defaultValue={1}
+              className="h-9 w-20"
+              aria-label={`Menge${unit ? ` (${unit})` : ""}`}
+            />
+          ) : (
+            <Hidden name="quantity" value={1} />
+          )}
+          <Input name="note" maxLength={200} placeholder="Notiz (optional)" className="h-9 min-w-0 flex-1 basis-40" aria-label="Notiz" />
+          <SubmitButton variant="outline" size="sm" className="h-9">
+            <Plus className="size-4" /> Eintragen
+          </SubmitButton>
+        </ActionForm>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
         <details className="flex-1">

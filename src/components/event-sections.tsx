@@ -69,7 +69,7 @@ export function EventSections({
           {needs.length > 0 ? (
             <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
               {needs.map((n) => (
-                <NeedAdmin key={n.id} need={n} />
+                <NeedAdmin key={n.id} need={n} members={memberOptions} />
               ))}
             </div>
           ) : null}
