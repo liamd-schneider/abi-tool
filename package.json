@@ -9,7 +9,12 @@
     "lint": "eslint",
     "create-admin": "node --env-file=.env.local scripts/create-admin.mjs",
     "db:push": "node --env-file=.env.local -e \"require('child_process').execSync('npx supabase db push --yes --remote='+JSON.stringify(process.env.DATABASE_URL),{stdio:'inherit'})\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "make-platform-admin": "node --env-file=.env.local scripts/make-platform-admin.mjs",
+    "dev:staging": "node --env-file=.env.staging.local node_modules/next/dist/bin/next dev",
+    "build:staging": "node --env-file=.env.staging.local node_modules/next/dist/bin/next build",
+    "start:staging": "node --env-file=.env.staging.local node_modules/next/dist/bin/next start",
+    "db:push:staging": "node --env-file=.env.staging.local -e \"require('child_process').execSync('npx supabase db push --yes --remote='+JSON.stringify(process.env.DATABASE_URL),{stdio:'inherit'})\""
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

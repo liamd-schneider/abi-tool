@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login"];
+// Ohne Login erreichbar: Landing Page, Login/Registrierung, Login-Links, Partner-Weiterleitung, Rechtliches
+const PUBLIC_PATHS = ["/login", "/registrieren", "/j", "/go", "/impressum", "/datenschutz", "/nutzungsbedingungen"];
 
 /** Erneuert die Login-Session bei jedem Request und schickt nicht eingeloggte Besucher zum Login. */
 export async function updateSession(request: NextRequest) {
@@ -29,7 +30,7 @@ export async function updateSession(request: NextRequest) {
   const isLoggedIn = Boolean(data?.claims?.sub);
 
   const { pathname, search } = request.nextUrl;
-  const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const isPublic = pathname === "/" || PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const isApi = pathname.startsWith("/api/");
 
   if (!isLoggedIn && !isPublic && !isApi) {

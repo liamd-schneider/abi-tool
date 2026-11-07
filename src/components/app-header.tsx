@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, Megaphone, Shield } from "lucide-react";
+import { Bell, Building2, Gift, Megaphone, Shield } from "lucide-react";
 import { DesktopNav } from "@/components/nav";
 import { Avatar } from "@/components/ui/misc";
 import type { Profile } from "@/lib/types";
@@ -18,16 +18,32 @@ export function Logo() {
 const iconLink =
   "relative inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
-export function AppHeader({ profile, unread }: { profile: Profile; unread: number }) {
+export function AppHeader({
+  profile,
+  unread,
+  platformAdmin = false,
+}: {
+  profile: Profile;
+  unread: number;
+  platformAdmin?: boolean;
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/90 pt-[env(safe-area-inset-top)] backdrop-blur">
-      <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-4 px-4">
-        <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
+      <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 px-4 sm:gap-4">
+        <Link href="/start" className="flex items-center gap-2 font-bold tracking-tight">
           <Logo />
-          <span>Abi-Tool</span>
+          <span className="hidden min-[400px]:inline">Abi-Tool</span>
         </Link>
         <DesktopNav />
         <div className="ml-auto flex items-center gap-0.5">
+          <Link href="/partner" className={iconLink} aria-label="Partner & Angebote" title="Partner & Angebote">
+            <Gift className="size-5" />
+          </Link>
+          {platformAdmin ? (
+            <Link href="/plattform" className={`${iconLink} hidden sm:inline-flex`} aria-label="Plattform" title="Plattform">
+              <Building2 className="size-5" />
+            </Link>
+          ) : null}
           <Link href="/neuigkeiten" className={iconLink} aria-label="Neuigkeiten" title="Neuigkeiten">
             <Megaphone className="size-5" />
           </Link>

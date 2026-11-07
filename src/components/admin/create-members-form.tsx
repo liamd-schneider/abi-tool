@@ -9,9 +9,12 @@ import { Field, Select, Textarea } from "@/components/ui/input";
 import { Notice } from "@/components/ui/misc";
 import { createMembers, type CreatedAccount } from "@/actions/admin";
 
-function downloadCsv(rows: CreatedAccount[]) {
+function downloadCsv(rows: CreatedAccount[], loginLink: string) {
   const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const csv = ["Name;Benutzername;Startpasswort", ...rows.map((r) => [r.full_name, r.username, r.password].map(escape).join(";"))].join(
+  const csv = [
+    "Name;Benutzername;Startpasswort;Login-Link",
+    ...rows.map((r) => [r.full_name, r.username, r.password, loginLink].map(escape).join(";")),
+  ].join(
     "\r\n",
   );
   const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
@@ -23,7 +26,7 @@ function downloadCsv(rows: CreatedAccount[]) {
   URL.revokeObjectURL(url);
 }
 
-export function CreateMembersForm() {
+export function CreateMembersForm({ loginLink }: { loginLink: string }) {
   const [state, action, pending] = useActionState(createMembers, null);
 
   useEffect(() => {
@@ -40,7 +43,7 @@ export function CreateMembersForm() {
   const created = state?.data?.created ?? [];
   const errors = state?.data?.errors ?? [];
   const copyText = created
-    .map((c) => `${c.full_name}\nBenutzername: ${c.username}\nPasswort: ${c.password}`)
+    .map((c) => `${c.full_name}\nLogin: ${loginLink}\nBenutzername: ${c.username}\nPasswort: ${c.password}`)
     .join("\n\n");
 
   return (
@@ -85,7 +88,7 @@ export function CreateMembersForm() {
             <p className="font-semibold">Zugangsdaten – nur jetzt sichtbar!</p>
             <div className="flex gap-2">
               <CopyButton text={copyText} label="Alles kopieren" />
-              <Button variant="outline" size="sm" onClick={() => downloadCsv(created)}>
+              <Button variant="outline" size="sm" onClick={() => downloadCsv(created, loginLink)}>
                 <Download className="size-4" /> CSV
               </Button>
             </div>

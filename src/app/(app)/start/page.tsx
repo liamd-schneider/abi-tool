@@ -13,14 +13,17 @@ import {
   Vote,
 } from "lucide-react";
 import { Countdown } from "@/components/countdown";
+import { PartnerCard } from "@/components/partner-card";
 import { PushPrompt } from "@/components/push";
+import type { Partner } from "@/lib/types";
 import { pushPublicKey } from "@/lib/push";
 import { DateBlock, LocationLink } from "@/components/event-bits";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, Multiline, Notice, SectionTitle } from "@/components/ui/misc";
-import { requireUser } from "@/lib/auth";
+import { getCurrentCohort, requireUser } from "@/lib/auth";
+import { cohortLabel } from "@/lib/cohort-label";
 import { formatDateLong, formatDateShort, formatDateTime, formatRange, formatTime, formatTimeRange, isUpcoming, nowMs, relativeDay } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { firstName } from "@/lib/utils";
@@ -79,6 +82,7 @@ const HOUR = 3_600_000;
 
 export default async function DashboardPage() {
   const me = await requireUser();
+  const cohort = await getCurrentCohort();
   const supabase = await createClient();
   const now = nowMs();
   const nowStr = new Date(now).toISOString();
@@ -151,12 +155,17 @@ export default async function DashboardPage() {
     .sort((a, b) => a.event_needs.events.starts_at.localeCompare(b.event_needs.events.starts_at));
 
   const news = newsRes.data ?? [];
+  const { data: partnerData } = await supabase.from("partners").select("*").eq("active", true).order("sort_order").limit(3);
+  const partners = (partnerData ?? []) as Partner[];
 
   return (
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Hallo {firstName(me.full_name)}!</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{formatDateLong(nowStr)}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {formatDateLong(nowStr)}
+          {cohort ? <span className="block sm:inline"><span className="hidden sm:inline"> · </span>{cohortLabel(cohort)}</span> : null}
+        </p>
       </div>
 
       <PushPrompt vapidKey={pushPublicKey()} />
@@ -447,6 +456,26 @@ export default async function DashboardPage() {
           </div>
         )}
       </section>
+
+      {/* Partner */}
+      {partners.length > 0 ? (
+        <section>
+          <SectionTitle
+            action={
+              <Link href="/partner" className="text-sm font-medium text-primary hover:underline">
+                Alle Angebote
+              </Link>
+            }
+          >
+            Angebote für euren Jahrgang
+          </SectionTitle>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {partners.map((p) => (
+              <PartnerCard key={p.id} partner={p} source="start" />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

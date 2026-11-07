@@ -14,6 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState, Role } from "@/lib/types";
 import { generatePassword, makeUsername, parseNameLine } from "@/lib/usernames";
+import { generateJoinCode } from "@/lib/cohorts";
 
 // =================================================================== Termine
 
@@ -79,7 +80,7 @@ export async function createMembers(
   _prev: ActionState<{ created: CreatedAccount[]; errors: string[] }>,
   fd: FormData,
 ): Promise<ActionState<{ created: CreatedAccount[]; errors: string[] }>> {
-  await requireAdmin();
+  const me = await requireAdmin();
   const lines = str(fd, "names")
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -89,7 +90,13 @@ export async function createMembers(
   if (lines.length > 200) return { error: "Maximal 200 Namen auf einmal." };
 
   const admin = createAdminClient();
-  const { data: existing, error: loadError } = await admin.from("profiles").select("username, full_name");
+  const { data: cohort } = await admin.from("cohorts").select("id, email_domain").eq("id", me.cohort_id).single();
+  if (!cohort) return { error: "Jahrgang nicht gefunden." };
+  // Benutzernamen müssen nur innerhalb des eigenen Jahrgangs eindeutig sein
+  const { data: existing, error: loadError } = await admin
+    .from("profiles")
+    .select("username, full_name")
+    .eq("cohort_id", cohort.id);
   if (loadError) return dbError(loadError);
 
   const taken = new Map((existing ?? []).map((p) => [p.username, p.full_name.toLowerCase()]));
@@ -117,7 +124,7 @@ export async function createMembers(
 
     const password = generatePassword();
     const { data, error } = await admin.auth.admin.createUser({
-      email: usernameToEmail(username),
+      email: usernameToEmail(username, cohort.email_domain),
       password,
       email_confirm: true,
       app_metadata: { username },
@@ -130,7 +137,7 @@ export async function createMembers(
 
     const { error: profileError } = await admin
       .from("profiles")
-      .insert({ id: data.user.id, username, full_name: parsed.full, role });
+      .insert({ id: data.user.id, username, full_name: parsed.full, role, cohort_id: cohort.id });
     if (profileError) {
       await admin.auth.admin.deleteUser(data.user.id);
       errors.push(`${parsed.full}: ${profileError.message}`);
@@ -154,10 +161,16 @@ export async function resetPassword(
   _prev: ActionState<CreatedAccount>,
   fd: FormData,
 ): Promise<ActionState<CreatedAccount>> {
-  await requireAdmin();
+  const me = await requireAdmin();
   const userId = str(fd, "user_id");
   const admin = createAdminClient();
-  const { data: profile } = await admin.from("profiles").select("username, full_name").eq("id", userId).maybeSingle();
+  // Nur Personen aus dem eigenen Jahrgang (Secret Key umgeht RLS – darum explizit prüfen)
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("username, full_name")
+    .eq("id", userId)
+    .eq("cohort_id", me.cohort_id)
+    .maybeSingle();
   if (!profile) return { error: "Person nicht gefunden." };
 
   const password = generatePassword();
@@ -194,6 +207,8 @@ export async function deleteMember(_prev: ActionState, fd: FormData): Promise<Ac
   const userId = str(fd, "user_id");
   if (userId === me.id) return { error: "Du kannst deinen eigenen Account nicht löschen." };
   const admin = createAdminClient();
+  const { data: target } = await admin.from("profiles").select("id").eq("id", userId).eq("cohort_id", me.cohort_id).maybeSingle();
+  if (!target) return { error: "Person nicht gefunden." };
   const { error } = await admin.auth.admin.deleteUser(userId);
   if (error) return { error: `Fehler: ${error.message}` };
   refresh();
@@ -311,4 +326,48 @@ export async function deletePoll(_prev: ActionState, fd: FormData): Promise<Acti
   if (error) return dbError(error);
   refresh();
   return { ok: true, message: "Abstimmung gelöscht." };
+}
+
+// =================================================================== Jahrgang & Schule
+
+export async function saveCohortSettings(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  const me = await requireAdmin();
+  const schoolName = str(fd, "school_name");
+  const cohortName = str(fd, "cohort_name");
+  const gradYear = Number.parseInt(str(fd, "grad_year"), 10);
+  if (schoolName.length < 2) return { error: "Bitte den Namen der Schule angeben." };
+  if (cohortName.length < 2) return { error: "Bitte einen Namen für den Jahrgang angeben." };
+
+  const supabase = await createClient();
+  const { data: cohort } = await supabase.from("cohorts").select("school_id").eq("id", me.cohort_id).single();
+  if (!cohort) return { error: "Jahrgang nicht gefunden." };
+
+  // Admins dürfen per Spalten-Recht nur Anzeigenamen ändern (RLS + GRANT in der Datenbank)
+  const { error: schoolError } = await supabase
+    .from("schools")
+    .update({ name: schoolName.slice(0, 160), city: optStr(fd, "city")?.slice(0, 100) ?? null })
+    .eq("id", cohort.school_id);
+  if (schoolError) return dbError(schoolError);
+  const { error: cohortError } = await supabase
+    .from("cohorts")
+    .update({ name: cohortName.slice(0, 80), grad_year: Number.isFinite(gradYear) ? gradYear : null })
+    .eq("id", me.cohort_id);
+  if (cohortError) return dbError(cohortError);
+
+  refresh();
+  return { ok: true, message: "Gespeichert." };
+}
+
+export async function regenerateJoinCode(): Promise<ActionState> {
+  const me = await requireAdmin();
+  const admin = createAdminClient();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { error } = await admin.from("cohorts").update({ join_code: generateJoinCode() }).eq("id", me.cohort_id);
+    if (!error) {
+      refresh();
+      return { ok: true, message: "Neuer Jahrgangs-Code erstellt. Der alte funktioniert nicht mehr." };
+    }
+    if (error.code !== "23505") return dbError(error);
+  }
+  return { error: "Bitte nochmal versuchen." };
 }

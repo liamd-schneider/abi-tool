@@ -6,7 +6,7 @@ import { CalendarDays, Cake, Clock, House, Vote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MAIN_ITEMS = [
-  { href: "/", label: "Start", icon: House },
+  { href: "/start", label: "Start", icon: House },
   { href: "/termine", label: "Termine", icon: CalendarDays },
   { href: "/schichten", label: "Schichten", icon: Clock },
   { href: "/dienste", label: "Dienste", icon: Cake },
@@ -17,6 +17,7 @@ const ADMIN_ITEMS = [
   { href: "/admin", label: "Übersicht" },
   { href: "/admin/termine", label: "Termine & Schichten" },
   { href: "/admin/mitglieder", label: "Mitglieder" },
+  { href: "/admin/jahrgang", label: "Jahrgang" },
   { href: "/admin/neuigkeiten", label: "Neuigkeiten" },
   { href: "/admin/abstimmungen", label: "Abstimmungen" },
   { href: "/admin/statistik", label: "Statistik" },

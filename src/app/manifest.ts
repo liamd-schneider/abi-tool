@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Abi-Tool",
     short_name: "Abi-Tool",
     description: "Termine, Schichten, Dienste und Abstimmungen für unseren Abi-Jahrgang",
-    start_url: "/",
+    start_url: "/start",
     display: "standalone",
     background_color: "#f9f9fc",
     theme_color: "#4f46e5",

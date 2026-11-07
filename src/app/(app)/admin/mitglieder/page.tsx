@@ -10,7 +10,10 @@ import { Avatar, PageHeader, SectionTitle } from "@/components/ui/misc";
 import { deleteMember, renameMember, setRole } from "@/actions/admin";
 import { requireAdmin } from "@/lib/auth";
 import { formatHours, formatStamp } from "@/lib/dates";
+import Link from "next/link";
+import { getCurrentCohort } from "@/lib/auth";
 import { loadLastSignIns } from "@/lib/login-status";
+import { getOrigin } from "@/lib/request";
 import { loadMemberStats } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
 import { FilterTabs } from "../../filter-tabs";
@@ -21,7 +24,13 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
   const me = await requireAdmin();
   const { filter = "alle" } = await searchParams;
   const supabase = await createClient();
-  const [allMembers, lastSignIns] = await Promise.all([loadMemberStats(supabase), loadLastSignIns()]);
+  const [allMembers, lastSignIns, cohort, origin] = await Promise.all([
+    loadMemberStats(supabase),
+    loadLastSignIns(),
+    getCurrentCohort(),
+    getOrigin(),
+  ]);
+  const loginLink = cohort ? `${origin}/j/${cohort.slug}` : `${origin}/login`;
   const admins = allMembers.filter((m) => m.role === "admin").length;
   const neverCount = allMembers.filter((m) => !lastSignIns.get(m.id)).length;
 
@@ -48,7 +57,14 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <CreateMembersForm />
+          <p className="mb-4 rounded-lg bg-muted px-3 py-2 text-sm">
+            Login-Link für euren Jahrgang: <code className="break-all">{loginLink}</code> – wird beim Kopieren und in der CSV
+            automatisch mitgeschickt.{" "}
+            <Link href="/admin/jahrgang" className="font-medium text-primary hover:underline">
+              Mehr
+            </Link>
+          </p>
+          <CreateMembersForm loginLink={loginLink} />
         </CardContent>
       </Card>
 

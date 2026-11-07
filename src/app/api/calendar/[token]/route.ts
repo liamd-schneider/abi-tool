@@ -22,7 +22,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
   if (!/^[a-f0-9]{32}$/.test(token)) return new Response("Ungültiger Link", { status: 404 });
 
   const admin = createAdminClient();
-  const { data: profile } = await admin.from("profiles").select("id, full_name").eq("calendar_token", token).maybeSingle();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("id, full_name, cohort_id")
+    .eq("calendar_token", token)
+    .maybeSingle();
   if (!profile) return new Response("Ungültiger Link", { status: 404 });
 
   const since = new Date(Date.now() - 60 * 86_400_000).toISOString();
@@ -32,6 +36,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     admin
       .from("events")
       .select("id, title, description, starts_at, ends_at, location_name, address")
+      .eq("cohort_id", profile.cohort_id)
       .eq("published", true)
       .gte("starts_at", since)
       .order("starts_at"),

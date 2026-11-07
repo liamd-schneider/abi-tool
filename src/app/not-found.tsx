@@ -7,7 +7,7 @@ export default function NotFound() {
       <p className="text-5xl font-bold text-primary">404</p>
       <h1 className="text-xl font-semibold">Seite nicht gefunden</h1>
       <p className="text-sm text-muted-foreground">Vielleicht wurde der Termin gelöscht oder der Link ist falsch.</p>
-      <Link href="/" className={buttonVariants()}>
+      <Link href="/start" className={buttonVariants()}>
         Zur Startseite
       </Link>
     </main>

@@ -12,7 +12,9 @@ import { Field, Input } from "@/components/ui/input";
 import { Avatar, Notice } from "@/components/ui/misc";
 import { changePassword, logout } from "@/actions/auth";
 import { regenerateCalendarToken } from "@/actions/member";
-import { requireUser } from "@/lib/auth";
+import Link from "next/link";
+import { getCurrentCohort, isPlatformAdmin, requireUser } from "@/lib/auth";
+import { cohortLabel } from "@/lib/cohort-label";
 import { formatHours } from "@/lib/dates";
 import { loadMemberStats } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
@@ -21,6 +23,7 @@ export const metadata: Metadata = { title: "Profil" };
 
 export default async function ProfilePage() {
   const me = await requireUser();
+  const [cohort, platformAdmin] = await Promise.all([getCurrentCohort(), isPlatformAdmin()]);
   const supabase = await createClient();
   const stats = (await loadMemberStats(supabase)).find((s) => s.id === me.id);
 
@@ -40,6 +43,12 @@ export default async function ProfilePage() {
           <p className="text-sm text-muted-foreground">
             @{me.username} {me.role === "admin" ? <Badge className="ml-1">Admin</Badge> : null}
           </p>
+          {cohort ? <p className="text-sm text-muted-foreground">{cohortLabel(cohort)}</p> : null}
+          {platformAdmin ? (
+            <Link href="/plattform" className="text-sm font-medium text-primary hover:underline">
+              Plattform-Bereich →
+            </Link>
+          ) : null}
         </div>
       </div>
 

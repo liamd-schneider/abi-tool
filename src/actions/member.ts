@@ -45,7 +45,7 @@ export async function cancelShift(_prev: ActionState, fd: FormData): Promise<Act
   // Kurzfristige Abmeldung (< 48 h) → Admins informieren
   if (shift && new Date(shift.starts_at).getTime() - nowMs() < 48 * 3_600_000) {
     const admin = createAdminClient();
-    const { data: admins } = await admin.from("profiles").select("id").eq("role", "admin");
+    const { data: admins } = await admin.from("profiles").select("id").eq("role", "admin").eq("cohort_id", me.cohort_id);
     const eventTitle = (shift.events as unknown as { title: string } | null)?.title ?? "";
     if (admins?.length) {
       await admin.from("notifications").insert(

@@ -8,6 +8,30 @@ export interface Profile {
   role: Role;
   calendar_token: string;
   admin_tour_done_at: string | null;
+  cohort_id: string;
+}
+
+export interface CohortInfo {
+  id: string;
+  name: string;
+  grad_year: number | null;
+  slug: string;
+  join_code: string;
+  active: boolean;
+  schools: { id: string; name: string; city: string | null } | null;
+}
+
+export interface Partner {
+  id: string;
+  name: string;
+  category: string;
+  description: string | null;
+  url: string;
+  logo_url: string | null;
+  discount_code: string | null;
+  highlight: string | null;
+  sort_order: number;
+  active: boolean;
 }
 
 export interface PersonRef {

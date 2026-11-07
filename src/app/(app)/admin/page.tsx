@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, EmptyState, PageHeader, PersonChip, SectionTitle } from "@/components/ui/misc";
 import { SetupChecklist } from "@/components/admin/setup-checklist";
-import { requireAdmin } from "@/lib/auth";
+import { getCurrentCohort, requireAdmin } from "@/lib/auth";
 import { formatDateShort, formatRange, formatStamp, formatTimeRange, isUpcoming, nowMs, relativeDay } from "@/lib/dates";
 import { loadLastSignIns } from "@/lib/login-status";
 import { Progress } from "@/components/ui/progress";
@@ -39,6 +39,7 @@ interface Activity {
 
 export default async function AdminOverviewPage() {
   const me = await requireAdmin();
+  const cohort = await getCurrentCohort();
   const supabase = await createClient();
   const now = nowMs();
   const weekAgo = new Date(now - 7 * 86_400_000).toISOString();
@@ -128,6 +129,12 @@ export default async function AdminOverviewPage() {
     .slice(0, 15);
 
   const checklist = [
+    {
+      label: "Schule & Jahrgang prüfen",
+      hint: "Schulname, Ort und Abi-Jahr – so erscheint ihr beim Login.",
+      href: "/admin/jahrgang",
+      done: Boolean(cohort?.schools && cohort.schools.name !== "Unsere Schule"),
+    },
     {
       label: "Mitglieder anlegen",
       hint: "Namensliste einfügen – Zugangsdaten werden automatisch erzeugt.",

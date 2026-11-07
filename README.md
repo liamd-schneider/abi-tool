@@ -96,3 +96,29 @@ src/
   proxy.ts        Session-Refresh + Weiterleitung zum Login
 supabase/migrations/   Datenbankschema, RLS, Trigger
 ```
+
+---
+
+## Mehrschulen-Plattform (Branch `mehrschulen`, noch nicht live)
+
+Auf diesem Branch wird aus dem Tool eine Plattform für beliebig viele Schulen und Jahrgänge.
+
+**Aufbau**
+- **Schule → Jahrgang** (`schools`, `cohorts`): Jeder Jahrgang ist komplett abgeschottet. Die Datenbank erzwingt das über `my_cohort_id()` in allen RLS-Policies; Benachrichtigungen „an alle“ gehen nur an den eigenen Jahrgang.
+- **Landing Page** auf `/`, **Registrierung** auf `/registrieren` (legt Schule, Jahrgang und den ersten Admin an). Die App liegt jetzt unter `/start`.
+- **Login**: weiterhin `vorname.nachname` + Passwort. Jeder Jahrgang hat einen **Login-Link** (`/j/<kennung>`, merkt sich den Jahrgang auf dem Gerät) und einen **Jahrgangs-Code**. Ist ein Benutzername plattformweit eindeutig, braucht es beides nicht.
+- **Admin → Jahrgang**: Schulname, Jahrgangsname, Login-Link & Code.
+- **Partner-Hub** (`/partner`, Teaser auf Landing Page und Startseite): Partnerangebote, immer als Anzeige gekennzeichnet. Klicks laufen über `/go/<id>` (Zählung + utm-Parameter).
+- **Plattform-Bereich** (`/plattform`, nur Plattform-Admins): alle Jahrgänge (sperren/freischalten), Partner pflegen, Klickzahlen.
+- Rechtliche Seiten (`/impressum`, `/datenschutz`, `/nutzungsbedingungen`) als **Entwürfe mit Platzhaltern** – vor dem Start ausfüllen und prüfen lassen.
+
+**Migration bestehender Daten**: `supabase/migrations/20261107100000_mehrschulen.sql` legt automatisch „Unsere Schule · Abi 2027“ an und hängt alle vorhandenen Daten daran. Bestehende Logins funktionieren unverändert (interne Domain `abi.local`).
+
+**Entwickeln gegen eine separate Test-Datenbank**
+```bash
+# .env.staging.local mit den Zugangsdaten des Test-Supabase-Projekts anlegen (gleiche Variablen wie .env.local)
+npm run db:push:staging     # alle Migrationen in die Test-DB
+npm run dev:staging         # App mit Test-DB starten
+npm run make-platform-admin -- vorname.nachname --jahrgang <kennung>
+```
+Die Variablen aus `.env.staging.local` haben Vorrang vor `.env.local` – die Live-Datenbank wird dabei nicht angefasst.

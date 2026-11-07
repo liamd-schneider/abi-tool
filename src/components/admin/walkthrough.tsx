@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Clock,
   LayoutDashboard,
+  Link2,
   Megaphone,
   Rocket,
   ShoppingCart,
@@ -55,9 +56,26 @@ const STEPS: Step[] = [
     ],
   },
   {
+    href: "/admin/jahrgang",
+    icon: Link2,
+    title: "1 · Jahrgang & Login-Link",
+    intro: "Hier stehen Name eurer Schule und eures Jahrgangs – und der Zugang für alle.",
+    points: [
+      <>Prüf, ob Schulname, Ort und Abi-Jahr stimmen. So erscheint euer Jahrgang beim Login.</>,
+      <>
+        Der <b>Login-Link</b> ist euer Eingang: Wer ihn einmal öffnet, muss den Jahrgang nie wieder angeben. Er wird beim
+        Anlegen von Accounts automatisch mit den Zugangsdaten verschickt.
+      </>,
+      <>
+        Der <b>Jahrgangs-Code</b> ist der Ersatz, falls jemand ohne Link einloggt und es den Benutzernamen an einer anderen
+        Schule auch gibt.
+      </>,
+    ],
+  },
+  {
     href: "/admin/mitglieder",
     icon: Users,
-    title: "1 · Mitglieder anlegen",
+    title: "2 · Mitglieder anlegen",
     intro: "Alle bekommen einen eigenen Account mit Benutzername und Passwort.",
     points: [
       <>
@@ -65,7 +83,8 @@ const STEPS: Step[] = [
       </>,
       <>Benutzernamen (vorname.nachname) und Startpasswörter werden automatisch erzeugt.</>,
       <>
-        <b>Zugangsdaten sofort als CSV sichern</b> – die Passwörter werden nur einmal angezeigt. Dann persönlich verteilen.
+        <b>Zugangsdaten sofort als CSV sichern</b> – die Passwörter werden nur einmal angezeigt. Dann persönlich verteilen (der
+        Login-Link ist automatisch dabei).
       </>,
       <>
         Weitere Komitee-Leute: auf die Person tippen → <b>Zum Admin machen</b>. Passwort vergessen? → <b>Passwort zurücksetzen</b>.
@@ -75,7 +94,7 @@ const STEPS: Step[] = [
   {
     href: "/admin/termine/neu",
     icon: CalendarPlus,
-    title: "2 · Termin anlegen",
+    title: "3 · Termin anlegen",
     intro: "Ob Kuchenverkauf, Party oder Abiball – alles beginnt mit einem Termin.",
     points: [
       <>
@@ -93,7 +112,7 @@ const STEPS: Step[] = [
   {
     href: "/admin/termine",
     icon: Clock,
-    title: "3 · Schichten, Spenden & Sortiment",
+    title: "4 · Schichten, Spenden & Sortiment",
     intro: "Tippe in der Liste auf einen Termin – dort richtest du alles Weitere ein.",
     points: [
       <>
@@ -113,7 +132,7 @@ const STEPS: Step[] = [
   {
     href: "/admin/termine",
     icon: ShoppingCart,
-    title: "4 · Orga-Team & Einkaufsliste",
+    title: "5 · Orga-Team & Einkaufsliste",
     intro: "Jeder Termin kann ein eigenes Orga-Team haben, das dir Arbeit abnimmt.",
     points: [
       <>
@@ -131,7 +150,7 @@ const STEPS: Step[] = [
   {
     href: "/admin/neuigkeiten",
     icon: Megaphone,
-    title: "5 · Neuigkeiten",
+    title: "6 · Neuigkeiten",
     intro: "Infos an den ganzen Jahrgang – ohne dass sie im Gruppenchat untergehen.",
     points: [
       <>Alle bekommen eine Benachrichtigung, mit aktiviertem Push auch direkt aufs Handy.</>,
@@ -143,7 +162,7 @@ const STEPS: Step[] = [
   {
     href: "/admin/abstimmungen",
     icon: Vote,
-    title: "6 · Abstimmungen",
+    title: "7 · Abstimmungen",
     intro: "Funktioniert wie eine WhatsApp-Umfrage.",
     points: [
       <>
@@ -158,7 +177,7 @@ const STEPS: Step[] = [
   {
     href: "/admin/statistik",
     icon: ChartColumn,
-    title: "7 · Statistik",
+    title: "8 · Statistik",
     intro: "Wer hat wie viel gemacht?",
     points: [
       <>
