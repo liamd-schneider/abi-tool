@@ -60,11 +60,27 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           {cohort ? <p className="text-sm text-muted-foreground">{cohortLabel(cohort)}</p> : null}
           {platformAdmin ? (
             <Link href="/plattform" className="text-sm font-medium text-primary hover:underline">
-              Plattform-Bereich →
+              System-Admin (alle Schulen) →
             </Link>
           ) : null}
         </div>
       </div>
+
+      {zweifaktor && aal.current !== "aal2" ? (
+        <Notice tone="warning" icon={<ShieldCheck className="size-5 text-warning-foreground" />}>
+          <p className="font-medium">
+            {zweifaktor === "plattform" ? "Für den System-Admin-Bereich" : "Für den Admin-Bereich eures Jahrgangs"} brauchst du die
+            Zwei-Faktor-Anmeldung.
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            Richte sie unten bei{" "}
+            <a href="#sicherheit" className="font-medium text-primary hover:underline">
+              „Zwei-Faktor-Anmeldung“
+            </a>{" "}
+            ein (dauert eine Minute, du brauchst eine Authenticator-App) – danach geht es direkt weiter.
+          </p>
+        </Notice>
+      ) : null}
 
       {stats ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

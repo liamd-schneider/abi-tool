@@ -1,8 +1,8 @@
 // Admin-Account in einem Jahrgang anlegen (danach geht alles über /admin/mitglieder).
 //
 //   npm run create-admin -- "Vorname Nachname"                       (wenn es nur einen Jahrgang gibt)
-//   npm run create-admin -- "Vorname Nachname" --jahrgang abi-2027
-//   npm run create-admin -- "Vorname Nachname" --jahrgang abi-2027 --passwort "MeinPasswort123"
+//   npm run create-admin -- "Vorname Nachname" --jahrgang taunusschule-bad-camberg-2027
+//   npm run create-admin -- "Vorname Nachname" --jahrgang taunusschule-bad-camberg-2027 --passwort "MeinPasswort123"
 //
 // Neue Jahrgänge legt man normalerweise über /registrieren an.
 // Liest NEXT_PUBLIC_SUPABASE_URL und SUPABASE_SECRET_KEY aus der Env-Datei.
@@ -20,7 +20,7 @@ const cohortSlug = flag("--jahrgang");
 const passwordArg = flag("--passwort");
 
 if (!fullNameArg || !fullNameArg.trim().includes(" ")) {
-  console.error('Bitte Vor- und Nachname angeben, z. B.: npm run create-admin -- "Max Mustermann" --jahrgang abi-2027');
+  console.error('Bitte Vor- und Nachname angeben, z. B.: npm run create-admin -- "Max Mustermann" --jahrgang taunusschule-bad-camberg-2027');
   process.exit(1);
 }
 

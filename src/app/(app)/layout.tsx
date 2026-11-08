@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
+import { cookies } from "next/headers";
 import { LogOut } from "lucide-react";
 import { AppHeader, Logo } from "@/components/app-header";
+import { CohortCookieSync } from "@/components/cohort-cookie-sync";
 import { MobileNav } from "@/components/nav";
 import { ServiceWorkerRegistrar } from "@/components/push";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/actions/auth";
 import { getCurrentCohort, isPlatformAdmin, requireUser } from "@/lib/auth";
+import { COHORT_COOKIE } from "@/lib/cohorts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -40,6 +43,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  const needsCohortCookie = (await cookies()).get(COHORT_COOKIE)?.value !== cohort.slug;
   const supabase = await createClient();
   const { count } = await supabase
     .from("notifications")
@@ -53,6 +57,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 md:pb-16">{children}</main>
       <MobileNav />
       <ServiceWorkerRegistrar />
+      {needsCohortCookie ? <CohortCookieSync /> : null}
     </>
   );
 }

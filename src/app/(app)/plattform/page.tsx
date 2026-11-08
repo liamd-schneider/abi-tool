@@ -1,283 +1,202 @@
 import type { Metadata } from "next";
-import { Building2, History, MousePointerClick, Pencil, ShieldAlert, Trash, Users } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Clock } from "lucide-react";
 import { ActionForm, Hidden, SubmitButton } from "@/components/action-form";
+import { StatTile } from "@/components/stat-tile";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox, Field, Input, Textarea } from "@/components/ui/input";
-import { AddPanel, PageHeader, SectionTitle } from "@/components/ui/misc";
-import { approveCohort, deletePartner, savePartner, setCohortActive } from "@/actions/platform";
-import { AUDIT_LABELS } from "@/lib/audit";
+import { EmptyState, Notice, PageHeader, SectionTitle } from "@/components/ui/misc";
+import { WeeklyBars } from "@/components/weekly-bars";
+import { approveCohort } from "@/actions/platform";
 import { requirePlatformAdmin } from "@/lib/auth";
-import { formatStamp, nowMs } from "@/lib/dates";
-import { fetchAll } from "@/lib/stats";
-import { createAdminClient } from "@/lib/supabase/admin";
-import type { Partner } from "@/lib/types";
+import { relativeDay } from "@/lib/dates";
+import { loadPlatformStats, type CohortStats } from "@/lib/platform-stats";
 
-export const metadata: Metadata = { title: "Plattform" };
+export const metadata: Metadata = { title: "System-Admin" };
 
-const CATEGORIES = ["Abi-Shirts & Pullis", "Abibuch & Druck", "Abiball & Location", "Abifahrt & Reisen", "Fotografie", "Party & DJ", "Finanzen"];
+const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 100) : 0);
 
-interface CohortRow {
-  id: string;
-  name: string;
-  slug: string;
-  active: boolean;
-  pending: boolean;
-  created_at: string;
-  schools: { name: string; city: string | null } | null;
+function StatusBadge({ c }: { c: CohortStats }) {
+  if (c.pending) return <Badge variant="warning">wartet auf Freigabe</Badge>;
+  if (!c.active) return <Badge variant="destructive">gesperrt</Badge>;
+  return <Badge variant="success">aktiv</Badge>;
 }
 
-interface AuditRow {
-  id: number;
-  actor_name: string | null;
-  action: string;
-  target: string | null;
-  created_at: string;
-}
-
-function PartnerFields({ partner }: { partner?: Partner }) {
+function CohortName({ c, mine }: { c: CohortStats; mine: boolean }) {
   return (
     <>
-      <Field label="Name *">
-        <Input name="name" defaultValue={partner?.name} required maxLength={120} />
-      </Field>
-      <Field label="Kategorie *">
-        <Input name="category" defaultValue={partner?.category} required maxLength={60} list="partner-categories" />
-      </Field>
-      <Field label="Link (mit Partner-/Affiliate-Kennung) *" className="sm:col-span-2">
-        <Input name="url" type="url" defaultValue={partner?.url} required placeholder="https://…" />
-      </Field>
-      <Field label="Hervorhebung" hint="z. B. „10 % für Abi-Jahrgänge“">
-        <Input name="highlight" defaultValue={partner?.highlight ?? ""} maxLength={80} />
-      </Field>
-      <Field label="Rabattcode">
-        <Input name="discount_code" defaultValue={partner?.discount_code ?? ""} maxLength={60} />
-      </Field>
-      <Field label="Beschreibung" className="sm:col-span-2">
-        <Textarea name="description" defaultValue={partner?.description ?? ""} maxLength={600} rows={2} />
-      </Field>
-      <Field label="Logo-URL (https)">
-        <Input name="logo_url" type="url" defaultValue={partner?.logo_url ?? ""} />
-      </Field>
-      <Field label="Reihenfolge">
-        <Input name="sort_order" type="number" defaultValue={partner?.sort_order ?? 0} />
-      </Field>
-      <Checkbox name="active" defaultChecked={partner?.active ?? true} label="Aktiv (für alle sichtbar)" className="sm:col-span-2" />
+      <span className="font-medium break-words">
+        {c.schoolName}
+        {c.city ? `, ${c.city}` : ""}
+      </span>
+      <span className="block text-xs text-muted-foreground">
+        {c.name}
+        {mine ? " · dein Jahrgang" : ""}
+      </span>
     </>
   );
 }
 
-export default async function PlatformPage() {
+function lastSeen(iso: string | null) {
+  return iso ? relativeDay(iso) : "–";
+}
+
+export default async function PlatformOverviewPage() {
   const me = await requirePlatformAdmin();
-  const admin = createAdminClient();
-  const since = new Date(nowMs() - 30 * 86_400_000).toISOString();
-
-  const [{ data: cohortData }, { count: schoolCount }, profiles, { data: partnerData }, clicks] = await Promise.all([
-    admin.from("cohorts").select("id, name, slug, active, pending, created_at, schools(name, city)").order("created_at", { ascending: false }),
-    admin.from("schools").select("id", { count: "exact", head: true }),
-    fetchAll<{ cohort_id: string }>((from, to) => admin.from("profiles").select("cohort_id").range(from, to)),
-    admin.from("partners").select("*").order("sort_order").order("name"),
-    fetchAll<{ partner_id: string; created_at: string }>((from, to) =>
-      admin.from("partner_clicks").select("partner_id, created_at").gte("created_at", since).range(from, to),
-    ),
-  ]);
-
-  const cohorts = ((cohortData ?? []) as unknown as CohortRow[]).sort((a, b) => Number(b.pending) - Number(a.pending));
-  const day = new Date(nowMs() - 86_400_000).toISOString();
-  const [{ data: auditData }, { count: failedLogins }, { count: loginRequests }, { count: registrations }] = await Promise.all([
-    admin.from("audit_log").select("id, actor_name, action, target, created_at").order("created_at", { ascending: false }).limit(40),
-    admin.from("rate_limits").select("id", { count: "exact", head: true }).like("key", "login-fail:%").gte("created_at", day),
-    admin.from("rate_limits").select("id", { count: "exact", head: true }).like("key", "login-ip:%").gte("created_at", day),
-    admin.from("rate_limits").select("id", { count: "exact", head: true }).like("key", "register-ip:%").gte("created_at", day),
-  ]);
-  const auditRows = (auditData ?? []) as AuditRow[];
-  const partners = (partnerData ?? []) as Partner[];
-  const members = new Map<string, number>();
-  for (const p of profiles) members.set(p.cohort_id, (members.get(p.cohort_id) ?? 0) + 1);
-  const clickCount = new Map<string, number>();
-  for (const c of clicks) clickCount.set(c.partner_id, (clickCount.get(c.partner_id) ?? 0) + 1);
-
-  const tiles = [
-    { label: "Schulen", value: schoolCount ?? 0, icon: Building2 },
-    { label: "Jahrgänge", value: `${cohorts.filter((c) => c.active).length}/${cohorts.length}`, icon: Users },
-    { label: "Mitglieder", value: profiles.length, icon: Users },
-    { label: "Partner-Klicks (30 Tage)", value: clicks.length, icon: MousePointerClick },
-  ];
+  const { cohorts, totals, weeks } = await loadPlatformStats();
+  const pending = cohorts.filter((c) => c.pending);
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <p className="mb-2 text-xs font-semibold tracking-wider text-primary uppercase">Plattform-Betrieb</p>
-        <PageHeader title="Plattform" description="Alle Schulen und Jahrgänge, Partner-Hub und Klickzahlen." className="mb-0" />
-      </div>
+      <PageHeader title="Alle Schulen" description="Wie viele Schulen, Jahrgänge und Mitglieder die Plattform nutzen." className="mb-0" />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {tiles.map(({ label, value, icon: Icon }) => (
-          <Card key={label}>
-            <CardContent className="flex items-center gap-3 pt-4 sm:pt-4">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
-                <Icon className="size-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold tabular-nums">{value}</p>
-                <p className="text-xs text-muted-foreground">{label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {pending.length > 0 ? (
+        <Notice tone="warning" icon={<Clock className="size-5 text-warning-foreground" />}>
+          <p className="font-medium">
+            {pending.length === 1 ? "1 neuer Jahrgang wartet" : `${pending.length} neue Jahrgänge warten`} auf deine Freigabe.
+          </p>
+          <ul className="mt-2 flex flex-col gap-2">
+            {pending.map((c) => (
+              <li key={c.id} className="flex flex-wrap items-center gap-2">
+                <Link href={`/plattform/jahrgang/${c.id}`} className="min-w-0 flex-1 break-words text-primary hover:underline">
+                  {c.schoolName}
+                  {c.city ? `, ${c.city}` : ""} · {c.name} ({c.members} {c.members === 1 ? "Account" : "Accounts"})
+                </Link>
+                <ActionForm action={approveCohort}>
+                  <Hidden name="id" value={c.id} />
+                  <SubmitButton size="sm" variant="success">
+                    Freigeben
+                  </SubmitButton>
+                </ActionForm>
+              </li>
+            ))}
+          </ul>
+        </Notice>
+      ) : null}
+
+      <section aria-label="Kennzahlen" className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <StatTile label="Schulen" value={totals.schools} />
+        <StatTile
+          label="Jahrgänge"
+          value={totals.cohorts}
+          hint={[`${totals.cohortsActive} aktiv`, totals.cohortsPending ? `${totals.cohortsPending} wartend` : "", totals.cohortsLocked ? `${totals.cohortsLocked} gesperrt` : ""]
+            .filter(Boolean)
+            .join(" · ")}
+        />
+        <StatTile label="Mitglieder" value={totals.members} hint={`Ø ${totals.cohorts ? Math.round(totals.members / totals.cohorts) : 0} pro Jahrgang`} />
+        <StatTile
+          label="Eingeloggt (30 Tage)"
+          value={totals.active30}
+          hint={`${pct(totals.active30, totals.members)} % aller Mitglieder`}
+        />
+        <StatTile
+          label="Neue Accounts (30 Tage)"
+          value={totals.newMembers30}
+          delta={{ value: totals.newMembers30 - totals.newMembersPrev30, period: "ggü. den 30 Tagen davor" }}
+        />
+        <StatTile label="Partner-Klicks (30 Tage)" value={totals.partnerClicks30} />
+      </section>
+
+      <Card>
+        <CardContent className="pt-4 sm:pt-5">
+          <WeeklyBars title="Neue Accounts pro Woche (letzte 12 Wochen)" data={weeks} unit={["Account", "Accounts"]} />
+        </CardContent>
+      </Card>
 
       <section>
         <SectionTitle>Jahrgänge ({cohorts.length})</SectionTitle>
-        <Card>
-          <ul className="divide-y divide-border">
-            {cohorts.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium break-words">
-                    {c.schools?.name ?? "?"}
-                    {c.schools?.city ? `, ${c.schools.city}` : ""} · {c.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {members.get(c.id) ?? 0} Mitglieder · seit {formatStamp(c.created_at)} · /j/{c.slug}
-                  </p>
-                </div>
-                {c.pending ? (
-                  <ActionForm action={approveCohort}>
-                    <Hidden name="id" value={c.id} />
-                    <SubmitButton size="sm" variant="success">
-                      Freigeben
-                    </SubmitButton>
-                  </ActionForm>
-                ) : null}
-                {c.pending ? <Badge variant="warning">wartet</Badge> : c.active ? <Badge variant="success">aktiv</Badge> : <Badge variant="destructive">gesperrt</Badge>}
-                {c.id !== me.cohort_id ? (
-                  <ActionForm
-                    action={setCohortActive}
-                    confirm={c.active ? `„${c.name}“ sperren? Niemand aus dem Jahrgang kommt dann noch rein.` : undefined}
-                  >
-                    <Hidden name="id" value={c.id} />
-                    <Hidden name="active" value={!c.active} />
-                    <SubmitButton size="sm" variant={c.active ? "destructive-ghost" : "outline"}>
-                      {c.active ? "Sperren" : "Freischalten"}
-                    </SubmitButton>
-                  </ActionForm>
-                ) : (
-                  <span className="text-xs text-muted-foreground">dein Jahrgang</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </section>
-
-      <section>
-        <SectionTitle>Sicherheit (letzte 24 Stunden)</SectionTitle>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {[
-            { label: "Fehlgeschlagene Logins", value: failedLogins ?? 0 },
-            { label: "Login-Anfragen", value: loginRequests ?? 0 },
-            { label: "Registrierungsversuche", value: registrations ?? 0 },
-          ].map((t) => (
-            <Card key={t.label}>
-              <CardContent className="flex items-center gap-3 pt-4 sm:pt-4">
-                <ShieldAlert className="size-5 shrink-0 text-primary" />
-                <div>
-                  <p className="text-xl font-bold tabular-nums">{t.value}</p>
-                  <p className="text-xs text-muted-foreground">{t.label}</p>
-                </div>
-              </CardContent>
+        {cohorts.length === 0 ? (
+          <EmptyState title="Noch keine Jahrgänge" />
+        ) : (
+          <>
+            {/* Desktop: Tabelle */}
+            <Card className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Schule / Jahrgang</th>
+                    <th className="px-2 py-2 font-medium">Status</th>
+                    <th className="px-2 py-2 text-right font-medium">Mitglieder</th>
+                    <th className="px-2 py-2 text-right font-medium">Schon eingeloggt</th>
+                    <th className="px-2 py-2 text-right font-medium">Aktiv 30 T.</th>
+                    <th className="px-2 py-2 text-right font-medium">Termine</th>
+                    <th className="px-2 py-2 text-right font-medium">Schicht-Anm.</th>
+                    <th className="px-2 py-2 text-right font-medium">Spenden</th>
+                    <th className="px-2 py-2 font-medium">Zuletzt aktiv</th>
+                    <th className="px-2 py-2" aria-label="Details" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {cohorts.map((c) => (
+                    <tr key={c.id} className="hover:bg-muted/50">
+                      <td className="px-4 py-2.5">
+                        <Link href={`/plattform/jahrgang/${c.id}`} className="block hover:text-primary">
+                          <CohortName c={c} mine={c.id === me.cohort_id} />
+                        </Link>
+                      </td>
+                      <td className="px-2 py-2.5">
+                        <StatusBadge c={c} />
+                      </td>
+                      <td className="px-2 py-2.5 text-right font-medium tabular-nums">{c.members}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums">
+                        {c.everLoggedIn} <span className="text-xs text-muted-foreground">({pct(c.everLoggedIn, c.members)} %)</span>
+                      </td>
+                      <td className="px-2 py-2.5 text-right tabular-nums">{c.active30}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums">{c.events}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums">{c.signups}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums">{c.pledges}</td>
+                      <td className="px-2 py-2.5 text-xs whitespace-nowrap text-muted-foreground">{lastSeen(c.lastActivity)}</td>
+                      <td className="px-2 py-2.5">
+                        <Link href={`/plattform/jahrgang/${c.id}`} aria-label={`Details zu ${c.name}`} className="text-muted-foreground hover:text-primary">
+                          <ChevronRight className="size-4" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </Card>
-          ))}
-        </div>
-      </section>
 
-      <section>
-        <SectionTitle>
-          <span className="inline-flex items-center gap-2">
-            <History className="size-5 text-primary" /> Protokoll (alle Jahrgänge)
-          </span>
-        </SectionTitle>
-        <Card>
-          <ul className="divide-y divide-border">
-            {auditRows.length === 0 ? <li className="px-4 py-3 text-sm text-muted-foreground">Noch keine Einträge.</li> : null}
-            {auditRows.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-2 text-sm">
-                <span className="w-28 shrink-0 text-xs text-muted-foreground tabular-nums">{formatStamp(r.created_at)}</span>
-                <span className="min-w-0 flex-1">
-                  <b>{AUDIT_LABELS[r.action] ?? r.action}</b>
-                  {r.target ? <span className="text-muted-foreground"> · {r.target}</span> : null}
-                </span>
-                <span className="text-xs text-muted-foreground">{r.actor_name ?? "System"}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </section>
-
-      <section>
-        <SectionTitle>Partner-Hub ({partners.length})</SectionTitle>
-        <datalist id="partner-categories">
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c} />
-          ))}
-        </datalist>
-        <div className="flex flex-col gap-3">
-          {partners.length > 0 ? (
-            <Card>
-              <ul className="divide-y divide-border">
-                {partners.map((p) => (
-                  <li key={p.id} className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium break-words">
-                          {p.name} <span className="font-normal text-muted-foreground">· {p.category}</span>
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">{p.url}</p>
-                      </div>
-                      <Badge variant="muted" className="tabular-nums">
-                        <MousePointerClick className="size-3" /> {clickCount.get(p.id) ?? 0} Klicks
-                      </Badge>
-                      {p.active ? <Badge variant="success">aktiv</Badge> : <Badge variant="muted">aus</Badge>}
-                    </div>
-                    <details className="mt-1">
-                      <summary className="inline-flex cursor-pointer items-center gap-1 py-1 text-xs font-medium text-primary">
-                        <Pencil className="size-3" /> Bearbeiten
-                      </summary>
-                      <div className="mt-2 flex flex-col gap-2">
-                        <ActionForm action={savePartner} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <Hidden name="id" value={p.id} />
-                          <PartnerFields partner={p} />
-                          <div className="sm:col-span-2">
-                            <SubmitButton size="sm">Speichern</SubmitButton>
+            {/* Mobil: Karten */}
+            <ul className="flex flex-col gap-2 md:hidden">
+              {cohorts.map((c) => (
+                <li key={c.id}>
+                  <Link href={`/plattform/jahrgang/${c.id}`} className="block">
+                    <Card className="transition-colors hover:border-primary/40">
+                      <CardContent className="flex flex-col gap-2 pt-4 sm:pt-4">
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <CohortName c={c} mine={c.id === me.cohort_id} />
                           </div>
-                        </ActionForm>
-                        <ActionForm action={deletePartner} confirm={`„${p.name}“ mit allen Klickzahlen löschen?`}>
-                          <Hidden name="id" value={p.id} />
-                          <SubmitButton variant="destructive-ghost" size="sm">
-                            <Trash className="size-4" /> Löschen
-                          </SubmitButton>
-                        </ActionForm>
-                      </div>
-                    </details>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : null}
-          <AddPanel title="Partner hinzufügen" defaultOpen={partners.length === 0}>
-            <ActionForm action={savePartner} resetOnSuccess className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <PartnerFields />
-              <div className="sm:col-span-2">
-                <SubmitButton size="sm">Anlegen</SubmitButton>
-              </div>
-            </ActionForm>
-          </AddPanel>
-          <p className="text-xs text-muted-foreground">
-            Klicks werden über /go/&lt;id&gt; gezählt; an den Partner-Link werden automatisch utm-Parameter angehängt (falls noch
-            keine vorhanden sind).
-          </p>
-        </div>
+                          <StatusBadge c={c} />
+                        </div>
+                        <dl className="grid grid-cols-3 gap-2 text-center">
+                          {[
+                            { label: "Mitglieder", value: c.members },
+                            { label: "eingeloggt", value: `${pct(c.everLoggedIn, c.members)} %` },
+                            { label: "aktiv 30 T.", value: c.active30 },
+                          ].map((s) => (
+                            <div key={s.label} className="rounded-lg bg-muted px-1 py-1.5">
+                              <dd className="font-semibold tabular-nums">{s.value}</dd>
+                              <dt className="text-[11px] text-muted-foreground">{s.label}</dt>
+                            </div>
+                          ))}
+                        </dl>
+                        <p className="text-xs text-muted-foreground">
+                          {c.events} Termine · {c.signups} Schicht-Anmeldungen · {c.pledges} Spenden · zuletzt aktiv {lastSeen(c.lastActivity)}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        <p className="mt-2 text-xs text-muted-foreground">
+          „Schon eingeloggt“ und „Aktiv“ beruhen auf dem letzten Login mit Passwort – wer dauerhaft eingeloggt bleibt, zählt ab
+          seinem letzten Login. „Zuletzt aktiv“ = letzter Login, neuer Termin, Schicht-Anmeldung oder Spende.
+        </p>
       </section>
     </div>
   );

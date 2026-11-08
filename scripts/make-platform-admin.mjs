@@ -1,7 +1,7 @@
 // Jemanden zum Plattform-Admin machen (darf Partner pflegen und Jahrgänge sperren).
 //
-//   npm run make-platform-admin -- vorname.nachname --jahrgang abi-2027
-//   npm run make-platform-admin -- vorname.nachname --jahrgang abi-2027 --entfernen
+//   npm run make-platform-admin -- vorname.nachname --jahrgang taunusschule-bad-camberg-2027
+//   npm run make-platform-admin -- vorname.nachname --jahrgang taunusschule-bad-camberg-2027 --entfernen
 
 import { createClient } from "@supabase/supabase-js";
 

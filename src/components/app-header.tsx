@@ -40,7 +40,7 @@ export function AppHeader({
             <Gift className="size-5" />
           </Link>
           {platformAdmin ? (
-            <Link href="/plattform" className={`${iconLink} hidden sm:inline-flex`} aria-label="Plattform" title="Plattform">
+            <Link href="/plattform" className={iconLink} aria-label="System-Admin" title="System-Admin">
               <Building2 className="size-5" />
             </Link>
           ) : null}

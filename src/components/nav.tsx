@@ -97,3 +97,32 @@ export function AdminNav() {
     </nav>
   );
 }
+
+const PLATFORM_ITEMS = [
+  { href: "/plattform", label: "Übersicht" },
+  { href: "/plattform/partner", label: "Partner-Hub" },
+  { href: "/plattform/protokoll", label: "Protokoll & Sicherheit" },
+];
+
+export function PlatformNav() {
+  const pathname = usePathname();
+  return (
+    <nav className="-mx-4 mb-6 flex gap-1 overflow-x-auto border-b border-border px-4 pb-px">
+      {PLATFORM_ITEMS.map(({ href, label }) => {
+        const active = href === "/plattform" ? pathname === href || pathname.startsWith("/plattform/jahrgang") : isActive(pathname, href);
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "border-b-2 border-transparent px-3 py-2 text-sm font-medium whitespace-nowrap text-muted-foreground hover:text-foreground",
+              active && "border-primary text-primary hover:text-primary",
+            )}
+          >
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
