@@ -1,12 +1,4 @@
--- =====================================================================
---  ERST AUSFÜHREN, WENN DIE MEHRSCHULEN-APP LIVE IST!
---  (Die bisherige App liest calendar_token beim Login und legt Profile ohne Jahrgang an –
---   mit dieser Datei würde sie nicht mehr funktionieren.)
---
---  Zum Go-live: Datei nach supabase/migrations/<zeitstempel>_nach_go_live.sql kopieren
---  und mit `npm run db:push` einspielen – direkt nachdem die neue Version deployt ist.
--- =====================================================================
-
+-- Go-live der Mehrschulen-Version am 2026-11-08 (vorher: supabase/launch/nach-go-live.sql)
 -- Kalender-Schlüssel ist geheim, nur bestimmte Spalten änderbar
 -- (vorher konnte jedes Mitglied die Kalender-Links der anderen auslesen)
 revoke select, insert, update, delete on public.profiles from authenticated;
