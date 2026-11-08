@@ -87,11 +87,9 @@ export async function login(_prev: LoginState, fd: FormData): Promise<LoginState
   await rememberCohort(cohort.slug);
   const next = safeNextPath(str(fd, "next"));
 
-  // 2FA eingerichtet? Dann erst noch den Code abfragen
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
-    redirect(`/login/2fa?next=${encodeURIComponent(next)}`);
-  }
+  // 2FA eingerichtet? (aus der Datenbank, nicht aus dem Cookie) Dann erst noch den Code abfragen
+  const { data: mfaEnabled } = await supabase.rpc("my_mfa_enabled");
+  if (mfaEnabled === true) redirect(`/login/2fa?next=${encodeURIComponent(next)}`);
   redirect(next);
 }
 

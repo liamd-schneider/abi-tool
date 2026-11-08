@@ -33,11 +33,18 @@ export const getCurrentCohort = cache(async (): Promise<CohortInfo | null> => {
   return (data as unknown as CohortInfo | null) ?? null;
 });
 
-/** Zwei-Faktor-Stand der Sitzung: current = jetzt, next = möglich (aal2 = 2FA eingerichtet) */
-export const getAal = cache(async () => {
+/**
+ * Zwei-Faktor-Stand der Sitzung: current = jetzt, next = möglich (aal2 = 2FA eingerichtet).
+ * Beides aus verlässlichen Quellen: "current" aus dem signaturgeprüften Token (getClaims),
+ * "next" aus der Datenbank – nie aus dem (manipulierbaren) Benutzerobjekt im Cookie.
+ */
+export const getAal = cache(async (): Promise<{ current: "aal1" | "aal2" | null; next: "aal1" | "aal2" | null }> => {
   const supabase = await createClient();
-  const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  return { current: data?.currentLevel ?? null, next: data?.nextLevel ?? null };
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims?.sub) return { current: null, next: null };
+  const current = data.claims.aal === "aal2" ? "aal2" : "aal1";
+  const { data: enabled } = await supabase.rpc("my_mfa_enabled");
+  return { current, next: enabled === true ? "aal2" : "aal1" };
 });
 
 export const isPlatformAdmin = cache(async (): Promise<boolean> => {
